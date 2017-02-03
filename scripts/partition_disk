@@ -1,0 +1,29 @@
+#!/bin/bash
+
+for disk in $(ls /dev/disk/by-id/google-local-ssd-*);
+do
+
+  # to create the partitions programatically (rather than manually)
+  # we're going to simulate the manual input to fdisk
+  # The sed script strips off all the comments so that we can
+  # document what we're doing in-line with the actual commands
+  # Note that a blank line (commented as \"default\" will send a empty
+  # line terminated with a newline to take the fdisk default.
+  sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk $disk
+    o # clear the in memory partition table
+    n # new partition
+    p # primary partition
+    1 # partition number 1
+      # default - start at beginning of disk
+    +185G #  parttion
+    n
+    p
+    2
+      # default
+    +185G
+    p # print the in-memory partition table
+    w # write the partition table
+    q # and we're done
+EOF
+
+done

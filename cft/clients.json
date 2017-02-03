@@ -1,0 +1,237 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+    "Description" : "Template to create an Aerospike cluster",
+    "Parameters" : {
+        "KeyPair" : {
+            "Description" : "Name of the KeyPair that would be used to ssh into the instances",
+            "Type" : "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription" : "Please specify the name of the keypair that you use to login"
+        },
+        "VPC" : {
+            "Description" : "The VPC to deploy into",
+            "Type" : "AWS::EC2::VPC::Id"
+        },
+        "VPCSubnet" : {
+            "Description" : "Choose a subnet from the VPC selected above.",
+            "Type" : "AWS::EC2::Subnet::Id"
+        },
+        "NumberOfInstances" : {
+            "Description" : "Number of instances in the cluster",
+            "Type" : "Number",
+            "Default" : "4",
+            "MinValue" : "1",
+            "MaxValue" : "15"
+        },
+        "InstanceType" : {
+            "Description" : "Type of EC2 instance to launch.",
+            "Type" : "String",
+            "Default" : "m3.large",
+            "AllowedValues" : [ "t2.micro", "t2.small", "t2.medium", "t2.large",
+                                "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", 
+                                "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge",
+                                "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+                                "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+                                "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+                                "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge"
+                                ]
+        },
+        "SpotPrice" : {
+            "Description" : "Your spot pricing bid. Use 0 to not use",
+            "Type" : "Number",
+            "Default" : "0"
+        }
+    },
+    "Mappings": {
+        "RegionMap": {
+            "us-east-1": {"name": "ami-34b6ed5e"},
+            "us-west-1": {"name": "ami-c5ed98a5"},
+            "us-west-2": {"name": "ami-01637960"},
+            "eu-west-1": {"name": "ami-cf268ebc"},
+            "eu-central-1": {"name": "ami-06e4fa6a"},
+            "ap-southeast-1": {"name": "ami-ed152883"},
+            "ap-southeast-2": {"name": "ami-5dce0033"},
+            "ap-northeast-1": {"name": "ami-41844822"},
+            "ap-northeast-2": {"name": "ami-d75673b4"},
+            "sa-east-1": {"name": "ami-14840578"}
+        }
+    },
+    "Conditions" : {
+        "NotUsingSpot" : { "Fn::Equals" : [ {  "Ref" : "SpotPrice" }, 0 ] },
+        "HasEphemeral" : { "Fn::Or" : [ { "Fn::Or" : [ 
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.medium" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.8xlarge" ]}
+                            ] },
+                            { "Fn::Or" : [
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.8xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.8xlarge" ]}
+                            ] }
+                        ] }
+    },
+
+    "Resources" : {
+        "ClusterRole" : {
+             "Type": "AWS::IAM::Role",
+             "Properties": {
+                "AssumeRolePolicyDocument": {
+                   "Version" : "2012-10-17",
+                   "Statement": [ {
+                      "Effect": "Allow",
+                      "Principal": {
+                         "Service": [ "ec2.amazonaws.com","autoscaling.amazonaws.com" ]
+                      },
+                      "Action": [ "sts:AssumeRole" ]
+                   } ]
+                },
+                "Path": "/",
+                "Policies": [ {
+                    "PolicyName": "AerospikeAutoScalingPolicy",
+                    "PolicyDocument" :{
+                        "Version" : "2012-10-17",
+                        "Statement" : [ {
+                            "Effect": "Allow",
+                            "Action": "autoscaling:*",
+                            "Resource": "*"
+                        } ]
+                    }
+                }]
+            }
+        },
+
+        "ClusterInstanceProfile": {
+             "Type": "AWS::IAM::InstanceProfile",
+             "Properties": {
+                "Path": "/",
+                "Roles": [ {
+                   "Ref": "ClusterRole"
+                } ]
+             }
+        },
+        "ClusterGroup" : {
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+                "LaunchConfigurationName" : { "Ref" : "LaunchConfig" }, 
+                "DesiredCapacity" : { "Ref" : "NumberOfInstances"},
+                "MinSize" : "1",
+                "MaxSize" : "15",
+                "VPCZoneIdentifier" : [{ "Ref" : "VPCSubnet" }],
+                "Tags" : [ {"Key" : "StackID", "Value" : { "Ref" : "AWS::StackId"}, "PropagateAtLaunch" : "true" } ]
+            },
+            "CreationPolicy" : {
+                "ResourceSignal": {
+                    "Count" : { "Ref" : "NumberOfInstances"},
+                    "Timeout" : "PT10M"
+                }
+            }
+        },
+        "LaunchConfig" : {
+            "Type" : "AWS::AutoScaling::LaunchConfiguration",
+            "Metadata" : {
+                "AWS::CloudFormation::Init" : {
+                    "config" : {
+                        "files" : {
+                            "/opt/aerospike/ssh" : {
+                                "content" : "%SSH%" ,
+                                "mode" : "000644",
+                                "owner" : "root",
+                                "group" : "root"
+                            },
+                            "/home/ec2-user/workload-aerospike" : {
+                                "content" : "%WORKLOAD%" ,
+                                "mode" : "000644",
+                                "owner" : "ec2-user",
+                                "group" : "ec2-user"
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties" : {
+                "InstanceType" : { "Ref" : "InstanceType"},
+                "KeyName" : { "Ref" : "KeyPair" },
+                "IamInstanceProfile" : { "Ref" : "ClusterInstanceProfile" },
+                "ImageId" : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "name" ]},
+                "AssociatePublicIpAddress" : "true",
+                "SecurityGroups" : [ { "Fn::GetAtt" : [ "InstanceSecurityGroup", "GroupId" ] } ],
+                "PlacementTenancy" : { "Fn::If" : [ "NotUsingSpot",
+                    "default",
+                    { "Ref" : "AWS::NoValue" }]
+                },
+                "SpotPrice" : { "Fn::If" : [ "NotUsingSpot",
+                    { "Ref" : "AWS::NoValue"},
+                    { "Ref" : "SpotPrice"} ]
+                },
+                "UserData" : { 
+                    "Fn::Base64" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -xe\n",
+                    "yum update -y aws-cfn-bootstrap\n",
+                    "yum install -y jq python26-argparse py-bcrypt git\n",
+                    "su - ec2-user -c 'git clone https://github.com/aerospike/YCSB'\n",
+                    "/opt/aws/bin/cfn-init -v ",
+                    "         --stack ", { "Ref" : "AWS::StackName" },
+                    "         --resource LaunchConfig ",
+                    "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                    "RET=$?\n",
+                    "cp /home/ec2-user/workload-aerospike /home/ec2-user/YCSB/workloads/\n",
+                    "cat /opt/aerospike/ssh >> /home/ec2-user/.ssh/authorized_keys\n",
+                    "/opt/aws/bin/cfn-signal -e $RET ",
+                    "     --stack ", { "Ref" : "AWS::StackName" },
+                    "     --resource ClusterGroup ",
+                    "     --region ", { "Ref" : "AWS::Region" }, "\n"
+                    ] ] }
+              } 
+            }
+        },
+    
+        "InstanceSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Enable ports needed by Aerospike",
+                "VpcId" : { "Ref" : "VPC" },
+                "SecurityGroupIngress" : [ {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "3000",
+                    "ToPort" : "3000",
+                    "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "22",
+                    "ToPort" : "22",
+                    "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "icmp",
+                    "FromPort" : "-1",
+                    "ToPort" : "-1",
+                    "CidrIp" : "0.0.0.0/0"
+                } ],
+                "Tags" : [ {"Key" : "StackID", "Value" : { "Ref" : "AWS::StackId"} } ]
+            }
+        },
+        "InstanceSecurityGroupIngress" : {
+            "Type" : "AWS::EC2::SecurityGroupIngress",
+            "Properties" : {
+                "GroupId" : { "Fn::GetAtt" : [ "InstanceSecurityGroup", "GroupId"] },
+                "IpProtocol" : "tcp",
+                "FromPort" : "3001",
+                "ToPort" : "3004",
+                "SourceSecurityGroupId" : { "Fn::GetAtt" : ["InstanceSecurityGroup", "GroupId"] }
+                },              
+            "DependsOn" : "InstanceSecurityGroup"
+        } 
+    }
+}

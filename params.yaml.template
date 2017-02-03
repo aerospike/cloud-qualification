@@ -1,0 +1,43 @@
+Platform: EC2   # GCP and EC2, if EC2, the following Servers and Clients section applies.
+Region: us-west-2    # The region to deploy in
+DCNames: MyDCs        # The name to give to your cloudformation stacks
+PKey: /home/myself/.ssh/aws_pkey.pem    # Path to your private key to use
+Servers:
+    # KeyPair name must be as it appears in Amazon
+    KeyPair: aws_key
+    VPC: vpc-<myvpc>
+    VPCSubnet: subnet-<mysubnet>
+    NumberOfInstances: 3
+    # Available selections
+    # "t2.micro", "t2.small", "t2.medium", "t2.large",
+    # "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge",
+    # "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge",
+    # "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+    # "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+    # "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+    # "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge"
+    InstanceType: c3.4xlarge
+    EBS: 0    # EBS volume size. Use "0" to not use.
+    AerospikeAMI: ami-4f34992f
+    SpotPrice: 0.3    # Use "0" to not use spot pricing, fall back to on-demand price.
+Clients:
+    KeyPair: aws_key
+    VPC: vpc-<myvpc>
+    VPCSubnet: subnet-<mysubnet>
+    NumberOfInstances: 1
+    InstanceType: c3.8xlarge
+    SpotPrice: 0.7    # default on-demand price for c3/c4.2xlarge
+Tests:
+    # values are comma delimited in the following order: start, end, interval.
+    # so with service-threads: 2,8,2, the test will start at 2, then 4, 6, and end at 8.
+#    service-threads: 2,8,2
+#    transaction-queues: 2,8,2
+#    transaction-threads-per-queue: 2,8,2
+#    max-write-cache:     not a performance item
+#    fabric-workers: 16,8,32
+#    post-write-queue: 128,1024,128
+#    allow-inline-transactions: true
+    # write-block-size, units are in kilobytes, interval is a multiplier
+    # so 128,1024,2 is: 128,256,512,1024
+#    write-block-size: 128,1024,2
+    write-block-size: 1024,1024,2

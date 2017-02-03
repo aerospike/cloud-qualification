@@ -1,0 +1,66 @@
+#!/bin/bash
+# /etc/init.d/aerospike_image
+set -x
+### BEGIN INIT INFO
+# Provides:          aerospike_image
+# Required-Start:    $remote_fs $network
+# Required-Stop:     $remote_fs $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Aerospike Initial install
+### END INIT INFO
+AEROSPIKE_VERSION=$(curl metadata/computeMetadata/v1beta1/instance/attributes/AEROSPIKE_VERSION)
+AEROSPIKE_CLUSTER=$(curl metadata/computeMetadata/v1beta1/instance/attributes/AEROSPIKE_CLUSTER)
+AEROSPIKE_CONF=/etc/aerospike/aerospike.orig
+AEROSPIKE_NS=$(curl metadata/computeMetadata/v1beta1/instance/attributes/AEROSPIKE_CONF)
+IFS='|' read -ra ASD_CLUSTER <<< "$AEROSPIKE_CLUSTER"
+function install(){
+#  apt-get update && apt-get install -y aerospike-tools
+  yum install -y aerospike-tools
+#  asd_exists=$(apt-cache show aerospike-server-community > /dev/null 2>&1; echo $?)
+#  if [ "$asd_exists" -ne "0" ]; then
+#    if [ -z "$AEROSPIKE_VERSION" ]; then
+#      apt-get install aerospike-server-community
+#    else
+#      apt-get install -y aerospike-server-community=${AEROSPIKE_VERSION}-1
+#    fi
+    #switch config files
+#    mv $AEROSPIKE_CONF /etc/aerospike/aerospike.conf.orig
+#    if [ -f /etc/aerospike/aerospike_mesh.conf ]; then  cp /etc/aerospike/aerospike_mesh.conf $AEROSPIKE_CONF; fi
+#    if [ -f /etc/aerospike/sample/aerospike_mesh.conf ]; then cp /etc/aerospike/sample/aerospike_mesh.conf $AEROSPIKE_CONF; fi
+#  fi
+  # virtual IP
+  #PUBLICIP=$(curl metadata/computeMetadata/v1beta1/instance/network-interfaces/0/access-configs/0/external-ip)
+  #if [ "$PUBLICIP" != "" ]; then
+#	sed -i "/.*access-address/d" $AEROSPIKE_CONF
+#   sed -i "/port 3000/a \\\t\taccess-address $PUBLICIP virtual" $AEROSPIKE_CONF
+# fi
+  #MESH IP
+  sed -i '/.*mesh-seed-address-port/d' $AEROSPIKE_CONF
+  for I in "${ASD_CLUSTER[@]}"; do
+    IP=$(python -c "import socket; print socket.gethostbyname(\"${I}\")")
+    sed -i "/interval/i \\\t\tmesh-seed-address-port $IP 3002" $AEROSPIKE_CONF
+  done
+  #NAMESPACE
+  if grep -xq "$AEROSPIKE_NS" $AEROSPIKE_CONF; then
+    : # do nothing
+  else
+    echo -e "$AEROSPIKE_NS" >> $AEROSPIKE_CONF
+  fi
+}
+case "$1" in
+    start)
+        install
+        service aerospike start
+        ;;
+    stop)
+        ;;
+    reinstall)
+        service aerospike stop
+        install
+        service aerospike start
+        ;;
+    *)
+        ;;
+esac
+exit 0

@@ -1,0 +1,2 @@
+*/1 * * * * root date >> /mnt/vnstat.log; vnstat -tr >> /mnt/vnstat.log
+*/1 * * * * root date >> /mnt/iostat.log; iostat -x >> /mnt/iostat.log

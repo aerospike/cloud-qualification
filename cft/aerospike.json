@@ -1,0 +1,361 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+    "Description" : "Template to create an Aerospike cluster",
+    "Parameters" : {
+        "KeyPair" : {
+            "Description" : "Name of the KeyPair that would be used to ssh into the instances",
+            "Type" : "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription" : "Please specify the name of the keypair that you use to login"
+        },
+        "VPC" : {
+            "Description" : "The VPC to deploy into",
+            "Type" : "AWS::EC2::VPC::Id"
+        },
+        "VPCSubnet" : {
+            "Description" : "Choose a subnet from the VPC selected above.",
+            "Type" : "AWS::EC2::Subnet::Id"
+        },
+        "AerospikeAMI" : {
+            "Description" : "The Aerospike AMI to use",
+            "Type" : "String"
+        },
+        "NumberOfInstances" : {
+            "Description" : "Number of instances in the cluster",
+            "Type" : "Number",
+            "Default" : "1",
+            "MinValue" : "1",
+            "MaxValue" : "15"
+        },
+        "InstanceType" : {
+            "Description" : "Type of EC2 instance to launch.",
+            "Type" : "String",
+            "Default" : "m3.large",
+            "AllowedValues" : [ "t2.micro", "t2.small", "t2.medium", "t2.large",
+                                "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", 
+                                "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge",
+                                "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+                                "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+                                "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+                                "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge"
+                                ]
+        },
+        "EBS" : {
+            "Description" : "Size of EBS SSD volume in GB. The volume will attach under /dev/sdg. Limit of 16000. Enter 0 to not use EBS.",
+            "Type" : "Number",
+            "Default" : "50",
+            "MinValue" : "0",
+            "MaxValue" : "16000"
+        },
+        "SpotPrice" : {
+            "Description" : "Your spot pricing bid. Use 0 to not use",
+            "Type" : "Number",
+            "Default" : "0"
+        }
+    },
+
+    "Conditions" : {
+        "NotUsingEBS" : { "Fn::Equals" : [ { "Ref" : "EBS" }, 0  ] },
+        "NotUsingSpot" : { "Fn::Equals" : [ {  "Ref" : "SpotPrice" }, 0 ] },
+        "HasEphemeral" : { "Fn::Or" : [ { "Fn::Or" : [ 
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.medium" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.8xlarge" ]}
+                            ] },
+                            { "Fn::Or" : [
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.8xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.8xlarge" ]}
+                            ] }
+                        ] }
+    },
+
+    "Resources" : {
+        "ClusterRole" : {
+             "Type": "AWS::IAM::Role",
+             "Properties": {
+                "AssumeRolePolicyDocument": {
+                   "Version" : "2012-10-17",
+                   "Statement": [ {
+                      "Effect": "Allow",
+                      "Principal": {
+                         "Service": [ "ec2.amazonaws.com","autoscaling.amazonaws.com" ]
+                      },
+                      "Action": [ "sts:AssumeRole" ]
+                   } ]
+                },
+                "Path": "/",
+                "Policies": [ {
+                   "PolicyName": "AerospikeClusterPolicy",
+                   "PolicyDocument": {
+                      "Version" : "2012-10-17",
+                      "Statement": [ {
+                         "Effect": "Allow",
+                         "Action": [ "ec2:DescribeInstances", "ec2:DescribeVpcAttribute" ],
+                         "Resource": "*"
+                      } ]
+                   }
+                },{
+                    "PolicyName": "AerospikeAutoScalingPolicy",
+                    "PolicyDocument" :{
+                        "Version" : "2012-10-17",
+                        "Statement" : [ {
+                            "Effect": "Allow",
+                            "Action": "autoscaling:*",
+                            "Resource": "*"
+                        } ]
+                    }
+                }]
+            }
+        },
+
+        "ClusterInstanceProfile": {
+             "Type": "AWS::IAM::InstanceProfile",
+             "Properties": {
+                "Path": "/",
+                "Roles": [ {
+                   "Ref": "ClusterRole"
+                } ]
+             }
+        },
+        "ClusterGroup" : {
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+                "LaunchConfigurationName" : { "Ref" : "LaunchConfig" }, 
+                "DesiredCapacity" : { "Ref" : "NumberOfInstances"},
+                "MinSize" : "1",
+                "MaxSize" : "15",
+                "VPCZoneIdentifier" : [{ "Ref" : "VPCSubnet" }],
+                "Tags" : [ {"Key" : "StackID", "Value" : { "Ref" : "AWS::StackId"}, "PropagateAtLaunch" : "true" } ,
+                           {"Key" : "Name" , "Value" : { "Ref" : "AWS::StackName"}, "PropagateAtLaunch" : "true" } ]
+            },
+            "CreationPolicy" : {
+                "ResourceSignal": {
+                    "Count" : { "Ref" : "NumberOfInstances"},
+                    "Timeout" : "PT10M"
+                }
+            }
+        },
+        "LaunchConfig" : {
+            "Type" : "AWS::AutoScaling::LaunchConfiguration",
+            "Metadata" : {
+                "AWS::CloudFormation::Init" : {
+                    "config" : {
+                        "files" : {
+                            "/opt/aerospike/namespace" : {
+                                "content" : "%NAMESPACE%" ,
+                                "mode" : "000644",
+                                "owner" : "root",
+                                "group" : "root"
+                            },
+                            "/opt/aerospike/ssh" : {
+                                "content" : "%SSH%" ,
+                                "mode" : "000644",
+                                "owner" : "root",
+                                "group" : "root"
+                            },
+                            "/opt/aerospike/partition_ephemeral" :{
+                                "content" : { "Fn::Join" : ["" , [
+                                   "#!/bin/bash\n",
+                                   "exit\n",
+                                   "if mount | grep -q /dev/xvdb; then umount /dev/xvdb; fi\n",
+                                   "# to create the partitions programatically (rather than manually)\n",
+                                   "# we're going to simulate the manual input to fdisk\n",
+                                   "# The sed script strips off all the comments so that we can\n",
+                                   "# document what we're doing in-line with the actual commands\n",
+                                   "# Note that a blank line (commented as \"default\" will send a empty\n",
+                                   "# line terminated with a newline to take the fdisk default.\n",
+                                   "sed -e 's/\\s*\\([\\+0-9a-zA-Z]*\\).*/\\1/' << EOF | fdisk $1\n",
+                                   "  o # clear the in memory partition table\n",
+                                   "  n # new partition\n",
+                                   "  p # primary partition\n",
+                                   "  1 # partition number 1\n",
+                                   "    # default - start at beginning of disk\n",
+                                   "  +370G # 4G parttion\n",
+                                   "  n\n",
+                                   "  p\n",
+                                   "  2\n",
+                                   "  \n",
+                                   "  +370G\n",
+                                   "  p # print the in-memory partition table\n",
+                                   "  w # write the partition table\n",
+                                   "  q # and we're done\n",
+                                   "EOF"
+                                ] ] },
+                                "mode" : "000744",
+                                "owner" : "root",
+                                "group" : "root"
+                            },
+                            "/opt/aerospike/aerospike_cluster" : {
+                                "content" : {  "Fn::Join" : ["", [
+                                   "#!/bin/bash\n",
+                                   "set -x\n",
+                                   "source /etc/profile\n",
+                                   "PUBLICIP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)\n",
+                                   "MYIP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)\n",
+                                   "CONF=/etc/aerospike/aerospike.orig\n",
+                                   "REGION=", { "Ref" : "AWS::Region" }, "\n",
+                                   "mv /opt/aerospike/namespace $CONF\n",
+                                   "#sed -i \"/port 3000/a \\\t\taccess-address $PUBLICIP virtual\" $CONF\n",
+                                   "sleep 30\n",
+                                   "# Point to all instances using the mesh-address config option\n",
+                                   "  HOSTNAMES=$(aws ec2 describe-vpc-attribute --vpc-id=",{ "Ref":"VPC"}," --region=$REGION --attribute=enableDnsHostnames --output=text | grep ENABLEDNSHOSTNAMES | awk '{print $2}')\n",
+                                   "  if [[ \"$HOSTNAMES\" == \"True\" ]]; then\n",
+                                   "    PRIVATEIP=$(aws ec2 describe-instances --filter Name=tag-key,Values=StackID Name=tag-value,Values=", { "Ref" : "AWS::StackId" }," --output=text --region=$REGION | grep PRIVATEIPADDRESSES | awk '{print $4}') \n",
+                                   "  else PRIVATEIP=$(aws ec2 describe-instances --filter Name=tag-key,Values=StackID Name=tag-value,Values=", { "Ref" : "AWS::StackId" }," --output=text --region=$REGION | grep PRIVATEIPADDRESSES | awk '{print $3}') \n",
+                                   "  fi\n",
+                                   "echo $PRIVATEIP >> /var/log/awsuserdatascript\n",
+                                   "sed -i '/.*mesh-seed-address-port/d' $CONF\n",
+                                   "for i in $PRIVATEIP; do ",
+                                   "  sed -i \"/interval/i \\\t\tmesh-seed-address-port $i 3002\" $CONF\n",
+                                   "done \n",
+                                   "cat /opt/aerospike/ssh >> /home/ec2-user/.ssh/authorized_keys\n",
+                                   "service aerospike start\n",
+                                   "cfn-signal -e 0",
+                                   "         --stack ", { "Ref" : "AWS::StackName" },
+                                   "         --resource ClusterGroup ",
+                                   "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                                   "echo OtherInstancesScriptFinish >> /var/log/awsuserdatascript\n"
+                                 ] ] },
+                                "mode" : "000744",
+                                "owner" : "root",
+                                "group" : "root"
+                            }
+                        },
+                        "commands" : {
+                            "02_form_cluster" : {
+                               "command" : "/opt/aerospike/aerospike_cluster",
+                               "cwd" : "/opt/aerospike"
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties" : {
+                "InstanceType" : { "Ref" : "InstanceType"},
+                "BlockDeviceMappings" : { "Fn::If" : [ "HasEphemeral",
+
+                     { "Fn::If" : [ "NotUsingEBS",
+                        [{
+                            "DeviceName" : "/dev/xvdb",
+                            "VirtualName" : "ephemeral0"
+                        },
+                        {   "DeviceName" : "/dev/xvdc",
+                            "VirtualName" : "ephemeral1"
+                        }],
+                        [{
+                            "DeviceName" : "/dev/xvdb",
+                            "VirtualName" : "ephemeral0"
+                        },
+                        {
+                            "DeviceName" : "/dev/sdg",
+                            "Ebs" : { "VolumeSize" : {"Ref" : "EBS" },
+                                     "VolumeType" : "gp2" }
+                        }]
+                    ] },
+                    { "Fn::If" : [ "NotUsingEBS",
+                        { "Ref" : "AWS::NoValue" },
+                        [{
+                            "DeviceName" : "/dev/sdg",
+                            "Ebs" : { "VolumeSize" : {"Ref" : "EBS" },
+                                     "VolumeType" : "gp2" }
+                        }]
+                    ] }
+                ] },
+                "KeyName" : { "Ref" : "KeyPair" },
+                "IamInstanceProfile" : { "Ref" : "ClusterInstanceProfile" },
+                "ImageId" : { "Ref" : "AerospikeAMI" },
+                "AssociatePublicIpAddress" : "true",
+                "SecurityGroups" : [ { "Fn::GetAtt" : [ "InstanceSecurityGroup", "GroupId" ] } ],
+                "PlacementTenancy" : { "Fn::If" : [ "NotUsingSpot",
+                    "default",
+                    { "Ref" : "AWS::NoValue" }]
+                },
+                "SpotPrice" : { "Fn::If" : [ "NotUsingSpot",
+                    { "Ref" : "AWS::NoValue"},
+                    { "Ref" : "SpotPrice"} ]
+                },
+                "UserData" : { 
+                    "Fn::Base64" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -xe\n",
+                    "yum update -y aws-cfn-bootstrap\n",
+                    "yum install -y jq python26-argparse py-bcrypt sysstat\n",
+                    "/opt/aws/bin/cfn-init -v ",
+                    "         --stack ", { "Ref" : "AWS::StackName" },
+                    "         --resource LaunchConfig ",
+                    "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                    "RET=$?\n",
+                    "if [ \"$RET\" -ne 0 ]; then \n",
+                    "    /opt/aws/bin/cfn-signal -e $RET ",
+                    "         --stack ", { "Ref" : "AWS::StackName" },
+                    "         --resource ClusterGroup ",
+                    "         --region ", { "Ref" : "AWS::Region" }, "\n",
+                    "fi\n"
+                    ] ] }
+                } 
+            }
+        },
+    
+        "InstanceSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Enable ports needed by Aerospike",
+                "VpcId" : { "Ref" : "VPC" },
+                "SecurityGroupIngress" : [ {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "3000",
+                    "ToPort" : "3001",
+                    "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "3003",
+                    "ToPort" : "3003",
+                    "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "22",
+                    "ToPort" : "22",
+                    "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "8081",
+                    "ToPort" : "8081",
+                    "CidrIp" : "0.0.0.0/0"
+
+                },
+                {
+                    "IpProtocol" : "icmp",
+                    "FromPort" : "-1",
+                    "ToPort" : "-1",
+                    "CidrIp" : "0.0.0.0/0"
+                } ],
+                "Tags" : [ {"Key" : "StackID", "Value" : { "Ref" : "AWS::StackId"} } ]
+            }
+        },
+        "InstanceSecurityGroupIngress" : {
+            "Type" : "AWS::EC2::SecurityGroupIngress",
+            "Properties" : {
+                "GroupId" : { "Fn::GetAtt" : [ "InstanceSecurityGroup", "GroupId"] },
+                "IpProtocol" : "tcp",
+                "FromPort" : "3002",
+                "ToPort" : "3002",
+                "SourceSecurityGroupId" : { "Fn::GetAtt" : ["InstanceSecurityGroup", "GroupId"] }
+                },              
+            "DependsOn" : "InstanceSecurityGroup"
+        }          
+    }
+}
