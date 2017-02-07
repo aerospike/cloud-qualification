@@ -1,4 +1,4 @@
-# Cloud Certification
+# Cloud Qualification
 
 This project contains scripts that will:
 
@@ -27,12 +27,30 @@ Parameters are in the following dimensions:
 
 ### 1. Server Parameters
 Server side parameters such as write-block-size and service-threads.  
-The default configs are held in `aerospike.conf`. A parameter *needs* to be defined in `aerospike.conf` in order for the Tests section of `params.yaml` to be applied. Otherwise the YCSB test will just run against your default config.
-See the Tests section of `params.yaml`
+The default configs are held in `aerospike.conf`.
+
+#### Tests Section
+A parameter *needs* to be defined in `aerospike.conf` in order for the Tests section of `params.yaml` to be applied. Otherwise the YCSB test will just run against your default config.
+
+Tests are formated like the follwing:
+`name: start,end,interval`
+
+* **name** - The aerospike config parameter to change. This is case sensitive
+* **start** - The starting value to test from
+* **end** - The ending value
+* **interval** - The interval between each successive value.
+
+For example:
+`service-threads: 2,8,2` means test the `service-threads` parameter, starting from 2, until you reach 8 or more, by increments of 2.  
+Therefore, you test `service-threads` with the following values: 2,4,6,8.
+
+_NOTE_
+For `write-block-size`, the interval is a multiplier. So `write-block-size: 128,1024,2` would mean testing `write-block-size` with values of: 128,256,512,1024.
+
 
 ### 2. Instance Parameters
 #### EC2 ####
-Aerospike instance size as in the cluster size, and instance type  
+Aerospike Server instance size as in the cluster size, and instance type  
 See the Servers section of `params.yaml` 
 
 YCSB Client instance size as in number of clients and instance type.
@@ -66,7 +84,7 @@ With X being a workload of 50/50 read/updates, of uniform access pattern.
 
 **Data Preload**
 
-The data should be preloaded to be near 50% of disk fnd 60% of memory for worst-case scenario. Object size would vary depending on ratio of memory to disk, to suit the instance type. This would be the limit for a 2 node cluster (due to replication factor of 2). Then add another node. The resulting 3 node cluster would form the basis for this test.
+The data should be preloaded to be near 50% of disk and 60% of memory for worst-case scenario. Object size would vary depending on ratio of memory to disk, to suit the instance type. This would be the limit for a 2 node cluster (due to replication factor of 2). Then add another node. The resulting 3 node cluster would form the basis for this test.
 
 To calculate record size and number of objects:
 
@@ -128,25 +146,21 @@ optional arguments:
 
 ## Files
 
-* cft - Directory of EC2 **C**loud**F**ormation **T**emplates. Used in spinning up an EC2 stack
-* scripts - Directory of scripts that may be used on the Aerospike Servers themselves for additional configurations
-* README.md - This README file
 * aerospike.conf - The default Aerospike configuration
-* aerospike.jinja - GCP template for creating Aerospike instances
-* aerospike.jinja.schema - GCP template for parameter validation
-* config.yaml - GCP config file 
+* cft - Directory of EC2 **C**loud**F**ormation **T**emplates. Used in spinning up an EC2 stack
 * create\_ec2\_stack - script to create an EC2 stack
-* params.yaml - The main config file for this project
+* params.yaml.template - Template for main config file for this project
+* README.md - This README file
 * requirements.txt - Python requirements file
 * run\_bench.py - The main script that runs the YCSB tests
-* workload-aerospike - The YCSB workload file that's run by YCSB for the benchmarking.
+* scripts - Directory of scripts that may be used on the Aerospike Servers themselves for additional configurations
+* workload-aerospike - The YCSB workload file that's run by YCSB for benchmarking.
 
 ```
 ├── aerospike.conf
 ├── cft
 │   ├── aerospike.json
 │   └── clients.json
-├── config.yaml
 ├── create_ec2_stack
 ├── create_graphs.py
 ├── data
