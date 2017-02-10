@@ -89,12 +89,12 @@ def parse_args():
                         , "--load"
                         , dest="load"
                         , action='store_true'
-                        , help="Run the Loading phase (Inserts)")
+                        , help="Run only the Loading phase (Inserts)")
     parser.add_argument("-r"
                         , "--run"
                         , dest="run"
                         , action='store_true'
-                        , help="Run the Running phase (Read/Update)")
+                        , help="Run only the Running phase (Read/Update)")
 
     args = parser.parse_args()
     

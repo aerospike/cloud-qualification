@@ -126,6 +126,26 @@ Create an environment using the respective `create_*_stack` script.
 
 Once the environment is up, use run\_bench.py to run the actual benchmarks.
 
+**For running a single YCSB test**  
+Ensure the **Test** section of `params.yaml` contains only a single test that doesn't change values.
+eg:
+```
+write-block-size: 1024,1024,2
+```
+Run a bench using:
+```
+./run_bunch.py -c params.yaml -n NAMESPACE -o TARGET_OPS -z YCSB_THREADS 
+```
+**For running a series of tests to determine impact of config changes**  
+Define your tests in the **Test** section of `params.yaml`. Then run the bench same as above.
+
+
+**For testing the limits of your environment**
+Run the bench without specifying `-o`, but set a high `-z`. This will allow YCSB to run as fast as it can.
+
+
+By default, YCSB will run its loading phase followed by all the tests in the running phase. You can manually separate the loading and running phases by specifying either `-l` or `-r`, respectively. Specifying both is the same as leaving them out.
+
 ```
 usage: run_bench.py [-h] [-v] -c CONFIG -n NAMESPACE [-d [DEPLOYMENT]]
                     [-p [PROJECT]] [-t [TEMPLATE]] [-o [OPS]] [-z [THREADS]]
@@ -148,8 +168,8 @@ optional arguments:
                         The target ops/s for YCSB
   -z [THREADS], --threads [THREADS]
                         The thread count for YCSB
-  -l, --load            Run the Loading phase (Inserts)
-  -r, --run             Run the Running phase (Read/Update)
+  -l, --load            Run only the Loading phase (Inserts)
+  -r, --run             Run only the Running phase (Read/Update)
 ```
 
 ## TODO
