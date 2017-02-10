@@ -21,7 +21,7 @@ This project can be utilized in several ways:
 * Boto3 for Python `sudo pip install --upgrade boto3`
   * AWS credentials pre-configured at ~/.aws/credentials
 * certificate based login to all systems
-* AWS account with cloudformation and ec2 priviliges.
+* AWS account with cloudformation and ec2 privileges.
 
 ## Parameters
 Parameters are in the following dimensions:
