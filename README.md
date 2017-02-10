@@ -32,7 +32,7 @@ The default configs are held in `aerospike.conf`.
 #### Tests Section
 A parameter *needs* to be defined in `aerospike.conf` in order for the Tests section of `params.yaml` to be applied. Otherwise the YCSB test will just run against your default config.
 
-Tests are formated like the follwing:
+Tests are formated like the following:
 `name: start,end,interval`
 
 * **name** - The aerospike config parameter to change. This is case sensitive
@@ -44,7 +44,7 @@ For example:
 `service-threads: 2,8,2` means test the `service-threads` parameter, starting from 2, until you reach 8 or more, by increments of 2.  
 Therefore, you test `service-threads` with the following values: 2,4,6,8.
 
-_NOTE_
+_NOTE_  
 For `write-block-size`, the interval is a multiplier. So `write-block-size: 128,1024,2` would mean testing `write-block-size` with values of: 128,256,512,1024.
 
 
