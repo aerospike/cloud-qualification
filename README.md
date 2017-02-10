@@ -13,8 +13,8 @@ With 100M objects, this process takes ~1 hour per YCSB test.
 This project can be utilized in several ways:
 
 1. Running a simple YCSB test with a pre-defined aerospike config
-2. Finding the limits of a particular instance/environment
-3. Finding the impact of Aerospike configuration changes
+2. Finding the impact of Aerospike configuration changes
+3. Finding the limits of a particular instance/environment
 
 ## Requirements
 
@@ -99,16 +99,25 @@ _AWS_
 
 The default settings are already configured for qualifying on instances with 30GB of ram.
 
-Edit `workload-aerospike` with the number of objects and object size as determined from above. `recordcount` and `operationcount` should match. Make sure that `maxexecutiontime` is long enough to run the entire test.
+Edit `workload-aerospike` with the number of objects and object size as determined from above. `operationcount` should be 3 times the amount of `recordcount`. Make sure that `maxexecutiontime` (in s) is long enough to run the entire test.
 
-Edit `params.yaml` such that the `Tests` section contains only the following:
+Make a copy of `params.yaml.template` and name it `params.yaml`. 
 
-```
-write-block-size: 1024,1024,2
-```
-This will result in only a single pass of testing, and all Aerospike parameters are kept at default (write block size at 1M)
+Replace the following variables with those matching your environment:
 
-The `-l` parameter for `run_benchmark.py` is used to set the target ops/s.
+* PKey
+* KeyPair - Servers and Clients
+* VPC  - Servers and Clients
+* VPCSubnet - Servers and Clients
+
+Create your environment:
+`./create_ec2_stack -p params.yaml`
+
+Then load your test:
+`./run_bench.py -c params.yaml -n ssd -l -z 400`
+
+Finally run your test:
+`./run_bench.py -c params.yaml -n ssd -o YOUR_TARGET_OPS -z 400 -r`
 
 ## Usage:
 
@@ -118,7 +127,8 @@ Once the environment is up, use run\_bench.py to run the actual benchmarks.
 
 ```
 usage: run_bench.py [-h] [-v] -c CONFIG -n NAMESPACE [-d [DEPLOYMENT]]
-                    [-p [PROJECT]] [-t [TEMPLATE]] [-l [LOAD]] [-z [THREADS]]
+                    [-p [PROJECT]] [-t [TEMPLATE]] [-o [OPS]] [-z [THREADS]]
+                    [-l] [-r]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -133,10 +143,12 @@ optional arguments:
                         The GCE project
   -t [TEMPLATE], --template [TEMPLATE]
                         The CFT for aerospike server
-  -l [LOAD], --load [LOAD]
+  -o [OPS], --ops [OPS]
                         The target ops/s for YCSB
   -z [THREADS], --threads [THREADS]
                         The thread count for YCSB
+  -l, --load            Run the Loading phase (Inserts)
+  -r, --run             Run the Running phase (Read/Update)
 ```
 
 ## TODO
