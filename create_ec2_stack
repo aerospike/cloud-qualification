@@ -1,0 +1,236 @@
+#!/usr/bin/env python
+
+import argparse
+import boto3
+import botocore
+import yaml
+import socket
+import csv
+import re
+import sys
+import time
+import subprocess
+from threading import Thread
+from pprint import pprint
+
+try:
+  import boto3
+except:
+  print "Boto3 is not installed. Please install boto3: sudo pip install boto3"
+  exit
+
+args = None
+macros = None
+
+def parse_args():
+    global args
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-v"
+                        , "--verbose"
+                        , action="store_true"
+                        , dest="debug"
+                        , help="Enable verbose logging")
+
+    parser.add_argument("-p"
+                        , "--params"
+                        , dest="config"
+                        , required=True
+                        , help="The param file to use")
+
+    parser.add_argument("-t"
+                        , "--template"
+                        , dest="template"
+                        , default='cft/aerospike.json'
+                        , nargs='?'
+                        , help="The CFT for aerospike server")
+    args = parser.parse_args()
+
+def ssh_command(ip,config,command):
+    ssh_cmd = "ssh"
+    if not args.debug: 
+        ssh_cmd += " -o LogLevel=QUIET "
+    ssh_cmd += " -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -t -i "+config['PKey']+" ec2-user@"+ip
+    sys_cmd = ssh_cmd +' "'+ command+'"'
+    proc = subprocess.Popen(sys_cmd, shell=True, stdout=subprocess.PIPE)
+    sys.stdout.write("\n")
+    return proc.stdout.read()
+
+
+#   EEEE CCCC 2222
+#   E    C       2
+#   EEE  C    2222
+#   E    C    2
+#   EEEE CCCC 2222
+
+
+def sanitize_json(string):
+        output = string.replace('\n','\\n')
+        output = output.replace('\t','\\t')
+        return output.replace('"','\\"')
+
+def create_parameters(config):
+    result=[]
+    for k,v in config.iteritems():
+        result.append( {'ParameterKey':k,'ParameterValue':str(v),'UsePreviousValue':False} )
+    return result
+
+
+def read_file(filename):
+    with open(filename,'r') as template_file:
+        try:
+            content = template_file.read()
+        except Exception as e:
+            print("Unable to open aerospike.cft",e)
+            exit(1)
+    return content
+
+#-----
+# Replace macros in CFT 
+#-----
+def insert_macros(template, macros):
+    myTemplate = template
+    for k,v in macros.items():
+        myTemplate = myTemplate.replace(k,sanitize_json(v),1)
+    return myTemplate
+
+#------
+# Create CFT stack
+#------
+def create_stack(botoClient, param, cft, name ):
+  global macros
+  try:
+    macros = { '%NAMESPACE%': sanitize_json(read_file('aerospike.conf')),
+               '%SSH%' : sanitize_json(read_file('../XDR_Testing/devops/infrastructure/ssh/authorized_keys')),
+               '%WORKLOAD%' : sanitize_json(read_file('workload-aerospike'))
+    }
+    template = read_file(cft)
+    myTemplate = insert_macros(template, macros)
+    return botoClient.create_stack(
+        StackName=name,
+        TemplateBody=myTemplate,
+        Parameters=param,
+        Capabilities=['CAPABILITY_IAM'],
+        OnFailure='DO_NOTHING')
+  except botocore.exceptions.ClientError as e:
+    if e.response['Error']['Code'] == 'AlreadyExistsException':
+        print "Server stack already exists, continuing"
+    else:
+        raise e
+
+#-----  
+# Extract AutoScalingGroup from CF stack
+#-----  
+def extract_autoscaling_group(cf_client,stack_id):
+    stack = cf_client.list_stack_resources(StackName=stack_id)['StackResourceSummaries']
+    for resource in stack:
+        if resource['ResourceType'] == 'AWS::AutoScaling::AutoScalingGroup':
+            return resource['PhysicalResourceId']
+        
+#----
+# Extract instance Ids from AutoScalingGroup
+#----   
+    
+def extract_instance_ids(autoscaling_client,autoscaling_group):
+    d = autoscaling_client.describe_auto_scaling_groups(AutoScalingGroupNames=[autoscaling_group])
+    return d['AutoScalingGroups'][0]['Instances']
+        
+    
+#-----  
+# Extract instance IP from instance list
+#----
+    
+def extract_instance_ip(ec2_client,instances,public=True):
+  ips = []
+  for instance in instances:
+    d = ec2_client.Instance(instance['InstanceId'])
+    if public:
+        ips.append(d.public_ip_address)
+    else:
+        ips.append(d.private_ip_address)
+  return ips
+
+#------------------------------------------------------------------------------
+# Check for Stack Creation Status
+#------------------------------------------------------------------------------
+
+def check_stack_status(cfn, stack_id,event_succ="CREATE_COMPLETE",event_fail="ROLLBACK_COMPLETE"):
+
+    # Defining Top Event Name and Success/Failure Status Messages
+    TIMEOUT=600
+    STACK_EVENT_NAME = "AWS::CloudFormation::Stack"
+    EVENT_SUCCESS = event_succ
+    EVENT_FAILED = event_fail
+    STATUS = True
+    count = 0
+    status_sleep = 15
+
+    while STATUS and int(count) < int(TIMEOUT):
+        stack_state = cfn.describe_stack_events(StackName=stack_id)
+        stack_state = stack_state['StackEvents'][0]
+        #print stack_state
+        stack_values = stack_state.values()
+        if STACK_EVENT_NAME in stack_values and EVENT_SUCCESS in stack_values:
+            print "Stack action successful : " + stack_state['StackId']
+            return "SUCCESS"
+        elif STACK_EVENT_NAME in stack_values and EVENT_FAILED in stack_values:
+            print "Stack action failed : " + stack_state['StackId']
+            return "FAILURE"
+        else:
+            count += status_sleep
+            print '.',
+            sys.stdout.flush()
+            time.sleep(status_sleep)
+    # we will reach here after timeout
+    print ''
+    print "WARNING: Timeout of " + str(TIMEOUT) + "reached. You may need to check manually."
+    return "TIMEOUT"
+
+parse_args()
+
+# Read in the params file
+with open(args.config,'r') as stream:
+    try:
+        config = yaml.load(stream)
+    except yaml.YAMLError as e:
+        print(e)
+        exit(1)
+
+serverParams = create_parameters(config['Servers'])
+clientParams = create_parameters(config['Clients'])
+
+print "Connecting to Cloudformation at %s"%(config['Region'])
+client = boto3.client('cloudformation',region_name=config['Region'])
+autoscale_client = boto3.client('autoscaling',region_name=config['Region'])
+ec2_resource = boto3.resource('ec2',region_name=config['Region'])
+
+print "Creating Servers"
+serverOutput = create_stack(client,serverParams,args.template,config['DCNames'])
+print "Creating Clients"
+clientOutput = create_stack(client,clientParams,'cft/clients.json',config['DCNames']+'-clients')
+
+print "Starting stack %s"%config['DCNames']
+if "SUCCESS" != check_stack_status(client, config['DCNames']):
+  print "Server stack not created"
+  exit
+print "Starting stack %s"%config['DCNames']+'-clients'
+if "SUCCESS" != check_stack_status(client, config['DCNames']+'-clients'):
+  print "Client stack not created"
+  exit
+
+
+client_group = extract_autoscaling_group(client,config['DCNames']+'-clients')
+clients = extract_instance_ids(autoscale_client,client_group)
+client_ips = extract_instance_ip(ec2_resource, clients)
+
+i=0
+workload=macros['%WORKLOAD%']
+workload_dict = dict(item.split('=') for item in workload.split("\\n")[:-1])
+recordcount=workload_dict['recordcount']
+record_per_instance = int(recordcount)/int(config['Clients']['NumberOfInstances'])
+for ip in client_ips:
+    #ssh in and rewrite workload
+    ssh_command(ip,config, "sudo echo -e 'insertstart=%d\ninsertcount=%d' >> YCSB/workload/workload-aerospike"%(i*record_per_instance,record_per_instance))
+    i+=1
+
+print "AWS stack is now created"
