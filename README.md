@@ -42,7 +42,7 @@ Tests are formated like the following:
 * **interval** - The interval between each successive value.
 
 For example:
-`service-threads: 2,8,2` means test the `service-threads` parameter, starting from 2, until you reach 8 or more, by increments of 2.  
+`service-threads: 2,8,2` means test the `service-threads` parameter starting from 2 until you reach 8 (or more), by increments of 2.  
 Therefore, you test `service-threads` with the following values: 2,4,6,8.
 
 _NOTE_  
@@ -154,7 +154,7 @@ optional arguments:
 
 ## TODO
 
-* GCP versions
+* GCP version
 
 
 ## Files
@@ -175,7 +175,6 @@ optional arguments:
 │   ├── aerospike.json
 │   └── clients.json
 ├── create_ec2_stack
-├── create_graphs.py
 ├── data
 ├── params.yaml.template
 ├── README.md

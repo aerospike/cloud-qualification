@@ -100,8 +100,8 @@ def insert_macros(template, macros):
 def create_stack(botoClient, param, cft, name ):
   global macros
   try:
-    macros = { '%NAMESPACE%': sanitize_json(read_file('aerospike.conf')),
-               '%WORKLOAD%' : sanitize_json(read_file('workload-aerospike'))
+    macros = { '#NAMESPACE#': sanitize_json(read_file('aerospike.conf')),
+               '#WORKLOAD#' : sanitize_json(read_file('workload-aerospike'))
     }
     template = read_file(cft)
     myTemplate = insert_macros(template, macros)
@@ -223,7 +223,7 @@ clients = extract_instance_ids(autoscale_client,client_group)
 client_ips = extract_instance_ip(ec2_resource, clients)
 
 i=0
-workload=macros['%WORKLOAD%']
+workload=macros['#WORKLOAD#']
 workload_dict = dict(item.split('=') for item in workload.split("\\n")[:-1])
 recordcount=workload_dict['recordcount']
 record_per_instance = int(recordcount)/int(config['Clients']['NumberOfInstances'])

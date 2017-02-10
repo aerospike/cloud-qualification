@@ -36,7 +36,7 @@
                                 "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
                                 "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
                                 "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
-                                "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge"
+                                "i2.xlarge", "i2.2xlarge", "i2.4xlarge"
                                 ]
         },
         "EBS" : {
@@ -56,29 +56,29 @@
     "Conditions" : {
         "NotUsingEBS" : { "Fn::Equals" : [ { "Ref" : "EBS" }, 0  ] },
         "NotUsingSpot" : { "Fn::Equals" : [ {  "Ref" : "SpotPrice" }, 0 ] },
-        "HasEphemeral" : { "Fn::Or" : [ { "Fn::Or" : [ 
+        "HasEphemeral" : { "Fn::Or" : [ 
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.medium" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.large" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.2xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.large" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.2xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.4xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.8xlarge" ]}
-                            ] },
-                            { "Fn::Or" : [
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.large" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.2xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.4xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.8xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.xlarge" ]},
-                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.2xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.8xlarge" ]}
-                            ] }
-                        ] }
+                        ] },
+		"Has2Ephemeral" : { "Fn::Or" : [
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.large" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.4xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.8xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.2xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.8xlarge" ]},
+                            { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.2xlarge" ]}
+							] },
+	    "Has4Ephemeral" : { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]}
     },
 
     "Resources" : {
@@ -154,13 +154,13 @@
                     "config" : {
                         "files" : {
                             "/opt/aerospike/namespace" : {
-                                "content" : "%NAMESPACE%" ,
+                                "content" : "#NAMESPACE#" ,
                                 "mode" : "000644",
                                 "owner" : "root",
                                 "group" : "root"
                             },
                             "/opt/aerospike/ssh" : {
-                                "content" : "%SSH%" ,
+                                "content" : "#SSH#" ,
                                 "mode" : "000644",
                                 "owner" : "root",
                                 "group" : "root"
@@ -245,18 +245,70 @@
             "Properties" : {
                 "InstanceType" : { "Ref" : "InstanceType"},
                 "BlockDeviceMappings" : { "Fn::If" : [ "HasEphemeral",
-
                      { "Fn::If" : [ "NotUsingEBS",
                         [{
                             "DeviceName" : "/dev/xvdb",
                             "VirtualName" : "ephemeral0"
-                        },
-                        {   "DeviceName" : "/dev/xvdc",
-                            "VirtualName" : "ephemeral1"
                         }],
                         [{
                             "DeviceName" : "/dev/xvdb",
                             "VirtualName" : "ephemeral0"
+                        },
+                        {
+                            "DeviceName" : "/dev/sdg",
+                            "Ebs" : { "VolumeSize" : {"Ref" : "EBS" },
+                                     "VolumeType" : "gp2" }
+                        }]
+                    ] },
+					{ "Fn::If" : [ "Has2Ephemeral",
+                     { "Fn::If" : [ "NotUsingEBS",
+                        [{
+                            "DeviceName" : "/dev/xvdb",
+                            "VirtualName" : "ephemeral0"
+						},{
+							"DeviceName" : "/dev/xvdc",
+							"VirtualName" : "ephemeral1"
+                        }],
+                        [{
+                            "DeviceName" : "/dev/xvdb",
+                            "VirtualName" : "ephemeral0"
+						},{
+							"DeviceName" : "/dev/xvdc",
+							"VirtualName" : "ephemeral1"
+                        },
+                        {
+                            "DeviceName" : "/dev/sdg",
+                            "Ebs" : { "VolumeSize" : {"Ref" : "EBS" },
+                                     "VolumeType" : "gp2" }
+                        }]
+                    ] },
+                    { "Fn::If" : [ "Has4Ephemeral",  
+                     { "Fn::If" : [ "NotUsingEBS",
+                        [{
+                            "DeviceName" : "/dev/xvdb",
+                            "VirtualName" : "ephemeral0"
+                        },{
+                            "DeviceName" : "/dev/xvdc",
+                            "VirtualName" : "ephemeral1"
+                        },{
+                            "DeviceName" : "/dev/xvdd",
+                            "VirtualName" : "ephemeral2"
+                        },{
+                            "DeviceName" : "/dev/xvd3",
+                            "VirtualName" : "ephemeral3"
+                        }],
+                        [{
+                            "DeviceName" : "/dev/xvdb",
+                            "VirtualName" : "ephemeral0"
+                        },{
+                            "DeviceName" : "/dev/xvdc",
+                            "VirtualName" : "ephemeral1"
+                        },{
+                            "DeviceName" : "/dev/xvdd",
+                            "VirtualName" : "ephemeral2"
+                        },{
+                            "DeviceName" : "/dev/xvde",
+                            "VirtualName" : "ephemeral3"
                         },
                         {
                             "DeviceName" : "/dev/sdg",
@@ -272,6 +324,8 @@
                                      "VolumeType" : "gp2" }
                         }]
                     ] }
+				] }
+				] }
                 ] },
                 "KeyName" : { "Ref" : "KeyPair" },
                 "IamInstanceProfile" : { "Ref" : "ClusterInstanceProfile" },
