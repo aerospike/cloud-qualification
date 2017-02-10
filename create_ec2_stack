@@ -101,7 +101,6 @@ def create_stack(botoClient, param, cft, name ):
   global macros
   try:
     macros = { '%NAMESPACE%': sanitize_json(read_file('aerospike.conf')),
-               '%SSH%' : sanitize_json(read_file('../XDR_Testing/devops/infrastructure/ssh/authorized_keys')),
                '%WORKLOAD%' : sanitize_json(read_file('workload-aerospike'))
     }
     template = read_file(cft)
