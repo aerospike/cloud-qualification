@@ -253,14 +253,14 @@ def update_server_config(servers, metric, value, config):
       ssh_command( server, config, command)
 
 def reset_server_ssd(servers, config):
-    print "Wiping SSD at /dev/sd[cdef]"
+    print "Wiping SSD at /dev/sd[bcde]"
     for server in servers:
-     # ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb1")
-     # ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb2")
-     # ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc1")
-     # ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc2")
       ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb")
-#      ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc")
+      if config['Servers']['InstanceType'] in ["c3.large","c3.xlarge","c3.2xlarge","c3.4xlarge","c3.8xlarge","m3.xlarge","m3.2xlarge","r3.8xlarge","i2.2xlarge"]:
+          ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc")
+      if config['Servers']['InstanceType'] in ["i2.2xlarge"]:
+          ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdd")
+          ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sde")
 
 def stop_server(servers,config):
     print "Stopping Aerospike"
@@ -272,12 +272,13 @@ def restart_server(servers,config):
     for server in servers:
       ssh_command(server,config, "sudo service aerospike restart")
     print "Waiting for clustering"
-    time.sleep(30)
-    print "Checking for migrations on %s"%(servers[0])
-    while is_migrating(servers[0]):
-      time.sleep(10)
-      print '.',
-      sys.stdout.flush()
+    time.sleep(60)
+    for server in servers:
+      print "Checking for migrations on %s"%(server)
+      while is_migrating(servers):
+        time.sleep(20)
+        print '.',
+        sys.stdout.flush()
     print "Migrations finished"
 
 
