@@ -100,6 +100,8 @@ _AWS_
 
 The default settings are already configured for qualifying on instances with 30GB of ram.
 
+Edit `aerospike.conf` to set your namespace configs. (eg: number of devices, storage engine, memory-size, etc...)
+
 Edit `workload-aerospike` with the number of objects and object size as determined from above. `operationcount` should be 3 times the amount of `recordcount`. Make sure that `maxexecutiontime` (in s) is long enough to run the entire test.
 
 Make a copy of `params.yaml.template` and name it `params.yaml`. 
@@ -121,6 +123,11 @@ Finally run your test:
 `./run_bench.py -c params.yaml -n ssd -o YOUR_TARGET_OPS -z 400 -r`
 
 ## Usage:
+
+Update/Edit the following 3 files according to your requirements:  
+1. workload-aerospike - This is the YCSB workload file to use. See [Core workload properties](https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties)
+2. aerospike.conf - This is the Aerospike config to use.
+3. param.yaml - This is the parameters for the cloud qualification.
 
 Create an environment using the respective `create_*_stack` script.
 
