@@ -275,7 +275,7 @@ def restart_server(servers,config):
     time.sleep(60)
     for server in servers:
       print "Checking for migrations on %s"%(server)
-      while is_migrating(servers):
+      while is_migrating(server):
         time.sleep(20)
         print '.',
         sys.stdout.flush()
