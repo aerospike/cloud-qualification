@@ -1,0 +1,27 @@
+#cloud-config for Azure YCSB Client instance
+
+runcmd:
+  - [ apt-get, update ]
+  - [ apt-get, upgrade, -y ]
+  - [ apt-get, install, -y, git, jq, python-argparse, python-bcrypt, maven, openjdk-7-jdk ]
+  - [ git, clone, "https://github.com/aerospike/YCSB" ]
+  - [ chmod, -R, 777, /YCSB ]
+  - [ cp, /root/workload-aerospike, /YCSB/workloads/ ]
+
+write_files:
+  - path: /root/workload-aerospike
+    content: |
+        recordcount=240000000
+        operationcount=1200000000
+        workload=com.yahoo.ycsb.workloads.CoreWorkload
+        fieldcount=1
+        fieldlength=3
+        readallfields=true
+        readproportion=0.5
+        updateproportion=0.5
+        scanproportion=0
+        insertproportion=0
+        maxexecutiontime=60000
+        requestdistribution=uniform
+    owner: root:root
+    permissions: '0755'

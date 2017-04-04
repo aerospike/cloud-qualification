@@ -1,0 +1,29 @@
+DCNames: MyDCs        # The name to give to your cloudformation stacks
+Region: us-west-2
+PKey: /home/myself/.ssh/id_rsa   # Path to your private key to use
+Servers:
+    # KeyPair name must be as it appears in Amazon
+    KeyPair: <MyKey>
+    VPC: vpc-<VPC>
+    VPCSubnet: subnet-<SUBNET>
+    NumberOfInstances: 3
+    # Available selections
+    # "t2.micro", "t2.small", "t2.medium", "t2.large",
+    # "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge",
+    # "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge",
+    # "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+    # "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+    # "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+    # "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge"
+    InstanceType: r3.xlarge
+    EBS: 0    # EBS volume size. Use "0" to not use.
+    AerospikeAMI: ami-4f34992f
+    SpotPrice: 0.166     # default on-demand price for r3.large
+                         # Use "0" to not use spot pricing, fall back to on-demand price.
+Clients:
+    KeyPair:  <MyKey>
+    VPC: vpc-<VPC>
+    VPCSubnet: subnet-<SUBNET>
+    NumberOfInstances: 1
+    InstanceType: c3.8xlarge
+    SpotPrice: 0.8    # default on-demand price for c3/c4.2xlarge

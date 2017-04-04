@@ -3,10 +3,10 @@
 This project contains scripts that will:
 
 1. Create an Aerospike cluster
-2. Create client systems
+2. Create client system(s)
 3. Run YCSB from client systems against the Aerospike cluster
 4. Change Aerospike parameters and reset the cluster
-5. Repeat 3 and 4 until all parameters are exhausted
+5. Repeat 3 and 4 until all defined parameters are exhausted
 
 With 100M objects, this process takes ~1 hour per YCSB test.
 
@@ -18,10 +18,17 @@ This project can be utilized in several ways:
 
 ## Requirements
 
+* SSH keys pre-generated
+  * `ssh-keygen`
+
+**AWS**
 * Boto3 for Python `sudo pip install --upgrade boto3`
   * AWS credentials pre-configured at ~/.aws/credentials
-* certificate based login to all systems
 * AWS account with cloudformation and ec2 privileges.
+**Azure**
+* Azure CLI 2.0, also signed in and authorized:
+  * See https://docs.microsoft.com/en-us/cli/azure/install-azure-cli for installation instructions
+  * `azure login`
 
 ## Parameters
 Parameters are in the following dimensions:
@@ -31,7 +38,7 @@ Server side parameters such as write-block-size and service-threads.
 The default configs are held in `aerospike.conf`.
 
 #### Tests Section
-A parameter *needs* to be defined in `aerospike.conf` in order for the Tests section of `params.yaml` to be applied. Otherwise the YCSB test will just run against your default config.
+A parameter *needs* to be defined in `aerospike.conf` in order for the Tests section of `tests.yaml` to be applied. Otherwise the YCSB test will just run against your default config.
 
 Tests are formated like the following:
 `name: start,end,interval`
@@ -52,10 +59,10 @@ For `write-block-size`, the interval is a multiplier. So `write-block-size: 128,
 ### 2. Instance Parameters
 #### EC2 ####
 Aerospike Server instance size as in the cluster size, and instance type  
-See the Servers section of `params.yaml` 
+See the Servers section of `ec2.params`
 
 YCSB Client instance size as in number of clients and instance type.
-See the Clients section of `params.yaml`
+See the Clients section of `ec2.params`
 
 **Notes** It is highly suggested to use spot pricing. Take a moment to check out spot pricing history and be flexible on which AZ to utilize to achieve maximum cost savings.
 
@@ -98,79 +105,119 @@ Data preload is done using YCSB's load phase.
 
 _AWS_
 
-The default settings are already configured for qualifying on instances with 30GB of ram.
+The default settings are already configured for qualifying on instances that can reserve 25GB of ram for Aerospike.
 
 Edit `aerospike.conf` to set your namespace configs. (eg: number of devices, storage engine, memory-size, etc...)
 
 Edit `workload-aerospike` with the number of objects and object size as determined from above. `operationcount` should be 3 times the amount of `recordcount`. Make sure that `maxexecutiontime` (in s) is long enough to run the entire test.
 
-Make a copy of `params.yaml.template` and name it `params.yaml`. 
+Make a copy of `ec2.template` and name it `ec2.params`. Update the values needed for your deployment.
 
 Replace the following variables with those matching your environment:
 
-* PKey
-* KeyPair - Servers and Clients
-* VPC  - Servers and Clients
-* VPCSubnet - Servers and Clients
+* PKey- Path to the pkey
+* KeyPair - The name of the pkey within AWS
+* VPC  - VPC of the Servers and Clients
+* VPCSubnet - Subnet of the Servers and Clients
 
 Create your environment:
-`./create_ec2_stack -p params.yaml`
+`./create_ec2_stack -p ec2.params`
 
 Then load your test:
-`./run_bench.py -c params.yaml -n ssd -l -z 400`
+`./run_bench.py -t tests.yaml -p ec2.params -n ssd -l -z 300`
 
 Finally run your test:
-`./run_bench.py -c params.yaml -n ssd -o YOUR_TARGET_OPS -z 400 -r`
+`./run_bench.py -t tests.yaml -p ec2.params -n ssd -o YOUR_TARGET_OPS -z 300 -r`
+
+_AZURE_
+
+The default settings are already configured for qualifying on instances that can reserve 25GB of ram for Aerospike.
+
+Create your own namespace file and upload it to a publically accessible location (eg: github). Edit `azure-resource-manager/azuredeploy.parameters.json` with the path of the file, along with the following
+
+* dnsName - The naming schema the VMs will have
+* vmUserName - The user account that will be created on the VMs
+* clusterSize - The size of the cluster
+* customNamespacePath - The path to your custom namespace file
+* sshPubkey - The contents of your public key, typically at `~/.ssh/id_rsa`
+
+Copy `azure.template` to `azure.params`, then update the values needed for deployment:
+
+* DEPLOYMENT - Give a deployment name. A new one will be created if not existing.
+* RESOURCEGROUP - Give a resource group to use. A new one will be created if not existing.
+* AZUREDIR - The ARM submodule path
+* ZONE - Azure zone to deploy into
+* PKey - Path to the pkey used above.
+
+Finally, update `workload-aerospike` that is contained within `CloudInitScript.txt` `operationcount` should be 3 times the amount of `recordcount`. Make sure that `maxexecutiontime` (in s) is long enough to run the entire test. 
+
+
+Create your environment;
+`./create_azure_stack -p azure.params`
+
+The load your test:
+`./run_bench.py -t tests.yaml -p azure.params -n ssd -l -z 300`
+
+Finally run your test:
+`./run_bench.py -t tests.yaml -p azure.params -n ssd -o YOUR_TARGET_OPS -z 300 -r`
+
+
 
 ## Usage:
 
-Update/Edit the following 3 files according to your requirements:  
-1. workload-aerospike - This is the YCSB workload file to use. See [Core workload properties](https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties)
-2. aerospike.conf - This is the Aerospike config to use.
-3. param.yaml - This is the parameters for the cloud qualification.
+Update/Edit the following files according to your requirements:  
+1. **AWS/GCP** workload-aerospike - This is the YCSB workload file to use. See [Core workload properties](https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties)
+  * **Azure** See CloudInitScript.txt to change the workload file for Azure
+2. **AWS/GCP**  aerospike.conf - This is the Aerospike config to use.
+3. azure.params / ec2.params / gcp.params - This is the parameters for the cloud qualification.
+4. tests.yaml - This is the test definition. See the Tests section above.
+5. **Azure** azure-resource-manager/azuredeploy.parameters.json - This is the azure system parameters.
+
+
 
 Create an environment using the respective `create_*_stack` script.
 
 Once the environment is up, use run\_bench.py to run the actual benchmarks.
 
 **For running a single YCSB test**  
-Ensure the **Test** section of `params.yaml` contains only a single test that doesn't change values.
+Ensure the **Test** section of `tests.yaml` contains only a single test that doesn't change values.
 eg:
 ```
 write-block-size: 1024,1024,2
 ```
 Run a bench using:
 ```
-./run_bunch.py -c params.yaml -n NAMESPACE -o TARGET_OPS -z YCSB_THREADS 
+./run_bunch.py -p PARAM_FILE -t tests.yaml -n NAMESPACE -o TARGET_OPS -z YCSB_THREADS 
 ```
 **For running a series of tests to determine impact of config changes**  
-Define your tests in the **Test** section of `params.yaml`. Then run the bench same as above.
+Define your tests in the **Test** section of `tests.yaml`. Then run the bench same as above.
 
 
 **For testing the limits of your environment**
-Run the bench without specifying `-o`, but set a high `-z`. This will allow YCSB to run as fast as it can.
+Run the bench without specifying `-o`, but set a high `-z`. This will allow YCSB to run as fast as it can. If you specified a `-z` that is too high, you will notice connection timeout errors during the beggining of each test.
 
 
 By default, YCSB will run its loading phase followed by all the tests in the running phase. You can manually separate the loading and running phases by specifying either `-l` or `-r`, respectively. Specifying both is the same as leaving them out.
 
 ```
-usage: run_bench.py [-h] [-v] -c CONFIG -n NAMESPACE [-d [DEPLOYMENT]]
-                    [-p [PROJECT]] [-t [TEMPLATE]] [-o [OPS]] [-z [THREADS]]
-                    [-l] [-r]
+usage: run_bench.py [-h] [-v] -p CONFIG -t TEST -n NAMESPACE [-d [DEPLOYMENT]]
+                    [-o [OPS]] [-z [THREADS]] [-l] [-r]
+                    platform location
+
+positional arguments:
+  platform              Azure, GCP, or EC2
+  location              The region/zone where you're deploying. eg: EC2: us-
+                        west-2, Azure: westus, GCP: us-central-1f
 
 optional arguments:
   -h, --help            show this help message and exit
   -v, --verbose         Enable verbose logging
-  -c CONFIG, --config CONFIG
-                        The config file to use
+  -p CONFIG, --params CONFIG
+                        The param file to use
+  -t TEST, --tests TEST
+                        The test definition file.
   -n NAMESPACE, --namespace NAMESPACE
                         The namespace to bench against
-  -d [DEPLOYMENT], --deployment [DEPLOYMENT]
-                        The GCE deployment
-  -p [PROJECT], --project [PROJECT]
-                        The GCE project
-  -t [TEMPLATE], --template [TEMPLATE]
-                        The CFT for aerospike server
   -o [OPS], --ops [OPS]
                         The target ops/s for YCSB
   -z [THREADS], --threads [THREADS]

@@ -19,6 +19,8 @@ from pprint import pprint
 #compute = discovery.build('compute','v1',credentials=credentials)
 #service = discovery.build('deploymentmanager','v2',credentials=credentials)
 
+import json
+
 args = None
 data = {}
 DATA_FILES="data"
@@ -38,41 +40,32 @@ except:
 def parse_args():
     global args
     parser = argparse.ArgumentParser()
-    
+
+    parser.add_argument("platform"
+                        , help="Azure, GCP, or EC2")
+
     parser.add_argument("-v"
                         , "--verbose"
                         , action="store_true"
                         , dest="debug"
                         , help="Enable verbose logging")
 
-    parser.add_argument("-c"
-                        , "--config"
+    parser.add_argument("-p"
+                        , "--params"
                         , dest="config"
                         , required=True
-                        , help="The config file to use")
+                        , help="The param file to use")
+    parser.add_argument("-t"
+                        , "--tests"
+                        , dest="test"
+                        , default='tests.yaml'
+                        , required=True
+                        , help="The test definition file.")
     parser.add_argument("-n"
                         , "--namespace"
                         , dest="namespace"
                         , required=True
                         , help="The namespace to bench against")
-    parser.add_argument("-d"
-                        , "--deployment"
-                        , dest="deployment"
-                        , default='aerospike-test'
-                        , nargs='?'
-                        , help="The GCE deployment")
-    parser.add_argument("-p"
-                        , "--project"
-                        , dest="project"
-                        , default='aerospike-dev'
-                        , nargs='?'
-                        , help="The GCE project")
-    parser.add_argument("-t"
-                        , "--template"
-                        , dest="template"
-                        , default='cft/aerospike.json'
-                        , nargs='?'
-                        , help="The CFT for aerospike server")
     parser.add_argument("-o"
                         , "--ops"
                         , dest="ops"
@@ -122,8 +115,7 @@ def add_data(metric, param, yaml_data,iteration):
     if key not in data[iteration]:
         data[iteration][key] = yaml_data
 
-def write_yaml_to_csv(yaml_data,config,version):
-    filename = "%s_%s_%s.csv"%(config['Servers']['InstanceType'], config['Servers']['NumberOfInstances'], version)
+def write_yaml_to_csv(filename,yaml_data):
     f = open(DATA_FILES+"/"+filename, 'wt')
     try:
         writer = csv.writer(f)
@@ -150,14 +142,14 @@ def write_yaml_to_csv(yaml_data,config,version):
 #-------
 def load_benchmark((ip,server,config)):
     print "Running insert benchmark"
-    stdout= ssh_command(ip,config,"source %s; cd YCSB; bin/ycsb load aerospike -s -threads %s -target %s -P workloads/workload-aerospike -p as.host=%s -p as.namespace=%s 2> load.log"%(profile,args.threads,args.ops,server,args.namespace))
+    stdout= ssh_command(ip,config,"source %s; cd /YCSB; bin/ycsb load aerospike -s -threads %s -target %s -P workloads/workload-aerospike -p as.host=%s -p as.namespace=%s 2> ~/load.log"%(profile,args.threads,args.ops,server,args.namespace))
     if args.debug:
         pprint(stdout)
     return stdout
 
 def run_benchmark((ip,server,config)):
     print "Running read/update benchmark"
-    stdout= ssh_command(ip,config, "source %s; cd YCSB; bin/ycsb run aerospike -s -threads %s -target %s -P workloads/workload-aerospike -p as.host=%s -p as.namespace=%s 2> run.log"%(profile,args.threads,args.ops,server,args.namespace))
+    stdout= ssh_command(ip,config, "source %s; cd /YCSB; bin/ycsb run aerospike -s -threads %s -target %s -P workloads/workload-aerospike -p as.host=%s -p as.namespace=%s 2> ~/run.log"%(profile,args.threads,args.ops,server,args.namespace))
     if args.debug:
         pprint(stdout)
     return stdout
@@ -165,7 +157,7 @@ def run_benchmark((ip,server,config)):
     
 def parse_output(ycsb_output):
     ycsb_dict = {}
-    for line in ycsb_output.split("\r\n"):
+    for line in ycsb_output.split('\r\n'):
         if line == '':
             continue
         pprint(line)
@@ -179,15 +171,18 @@ def parse_output(ycsb_output):
 #--------
 # Run the tests found in the Tests section of the config
 #-------
-def run_tests(client_ips,server,config,iteration):
+def run_tests(client_ips,server,config):
     global asd_version, private_ips  
     asd_version  = get_asd_version(server[0],config).replace(' ','_').strip()
-    for test,values in config['Tests'].iteritems():
+    backup_config(server,config)
+    for test,values in tests['Tests'].iteritems():
         start, end, interval = map(int, values.split(','))
         while (start <= end):
             params = []
             for ip in client_ips:
               params.append((ip,private_ips[0],config))
+            if args.debug:
+              pprint(params)
             if  not args.run or (args.run and args.load):
                 stop_server(server,config)
                 reset_server_ssd(server,config)
@@ -228,7 +223,7 @@ def ssh_command(ip,config,command):
     return proc.stdout.read()
 
 #----
-# Reconfigure the server
+# ASD Cluster Commands
 #-----
 def get_asd_version(server,config):
     print "Obtaining Server Version"
@@ -246,7 +241,7 @@ def backup_config(servers,config):
 
 def update_server_config(servers, metric, value, config):
     print "Reconfiguring server metric: %s with value %s"%(metric, value)
-    command = "sed 's/%s.*/%s %s/' /etc/aerospike/aerospike.orig | sudo tee /etc/aerospike/aerospike.conf"%(metric,metric,value)
+    command = "sed 's/%s.*/%s %s/' /etc/aerospike/aerospike.bak | sudo tee /etc/aerospike/aerospike.conf"%(metric,metric,value)
     if not args.debug:
         command += " > /dev/null"
     for server in servers:
@@ -256,11 +251,12 @@ def reset_server_ssd(servers, config):
     print "Wiping SSD at /dev/sd[bcde]"
     for server in servers:
       ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb")
-      if config['Servers']['InstanceType'] in ["c3.large","c3.xlarge","c3.2xlarge","c3.4xlarge","c3.8xlarge","m3.xlarge","m3.2xlarge","r3.8xlarge","i2.2xlarge"]:
-          ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc")
-      if config['Servers']['InstanceType'] in ["i2.2xlarge"]:
-          ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdd")
-          ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sde")
+      if 'EC2' ==  args.platform:
+        if config['Servers']['InstanceType'] in ["c3.large","c3.xlarge","c3.2xlarge","c3.4xlarge","c3.8xlarge","m3.xlarge","m3.2xlarge","r3.8xlarge","i2.2xlarge"]:
+            ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc")
+        if config['Servers']['InstanceType'] in ["i2.2xlarge"]:
+            ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdd")
+            ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sde")
 
 def stop_server(servers,config):
     print "Stopping Aerospike"
@@ -396,40 +392,83 @@ def extract_gce_instances(project,deployment):
             instances.append(resource['name'])
     return instances
 
-#-----
-# The parallelized workload
-#----
-def run_main(iteration):
+#    A  ZZZZ U  U RRR  EEEE
+#   A A    Z U  U R  R E
+#  AAAA  Z   U  U RR   EEE
+#  A  A Z    U  U R R  E
+#  A  A ZZZZ UUUU R  R EEEE
+
+def shell_command(command):
+    proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+    sys.stdout.write("\n")
+    return proc.stdout.read()
+
+def extract_azure_ips(name,group):
+    azure_instances=shell_command("azure network public-ip list %s --json"%group)
+    azure_results=json.loads(azure_instances)
+    if args.debug:
+      print "azure command output: %s"%json.dumps(azure_results)
+    publicIP=[]
+    for entry in azure_results:
+        if entry['name'].startswith(name):
+            publicIP.append(entry['ipAddress'])
+    return publicIP
+    
+
+##############
+# The workload
+##############
+def run_main():
     global private_ips
-    if "EC2" == config['Platform']:
+    global user
+    group = None
+    if "EC2" == args.platform:
         print "Connecting to Cloudformation at %s"%(config['Region'])
         client = boto3.client('cloudformation',region_name=config['Region'])
         autoscale_client = boto3.client('autoscaling',region_name=config['Region'])
         ec2_resource = boto3.resource('ec2',region_name=config['Region'])
         group = extract_autoscaling_group(client,config['DCNames'])
         client_group = extract_autoscaling_group(client,config['DCNames']+'-clients')
-    if "GCP" == config['Platform']:
-        group = extract_gce_instances(args.project,args.deployment)
+    if "GCP" == args.platform:
+        group = extract_gce_instances(config['project'],config['deployment'])
+    if "Azure" == args.platform:
+        group = config['RESOURCEGROUP']
     if args.debug:
         pprint(group)
     if group is None:
         print "Instances not found. Aborting"
         exit(1)
-    if "EC2" == config['Platform']:
+    if "EC2" == args.platform:
+        user='ec2-user'
         instances = extract_instance_ids(autoscale_client,group)
         client_instances = extract_instance_ids(autoscale_client,client_group)
         server_ips = extract_instance_ip(ec2_resource,instances,public=True)
         client_ips = extract_instance_ip(ec2_resource,client_instances)
         private_ips = extract_instance_ip(ec2_resource,instances,public=False)
-    if "GCP" == config['Platform']:
-        server_ips = extract_gce_ips(args.project,"us-central1-f",group)
-        client_ips = extract_gce_ips(args.project,"us-central1-f",["bench-client"])   
+    if "GCP" == args.platform:
+        user='root'
+        server_ips = extract_gce_ips(config['project'],"us-central1-f",group)
+        client_ips = extract_gce_ips(config['project'],"us-central1-f",["bench-client"])   
+    if "Azure" == args.platform:
+        user=config['USER']
+        server_ips = extract_azure_ips(config['DCNames'],group)
+        client_ips = extract_azure_ips(config['DCNames'].lower()+'clients',group)
+        private_ips = ["10.0.1.4"] # hardcoded in ARM template
     
-    run_tests(client_ips,server_ips,config, iteration)
+    if args.debug:
+        print "Client ips:"
+        print client_ips
+        print "Servier ips:"
+        print server_ips
+        print "Server private ips:"
+        print private_ips
+    run_tests(client_ips,server_ips,config)
 
-##################
-# begin main part
-##################
+
+
+#----------------
+# Initialization
+#----------------
 
 parse_args()
 
@@ -437,22 +476,57 @@ if args.debug:
     print "Reading params.yml file"
 
 # Read in the params file
-with open(args.config,'r') as stream:
+if "EC2" == args.platform:
+  with open(args.config,'r') as stream:
+      try:
+          config = yaml.load(stream)
+      except yaml.YAMLError as e:
+          print(e)
+          exit(1)
+elif "Azure" == args.platform:
+  conffile = open(args.config,'r').readlines()
+  config = {}
+  for line in conffile:
     try:
-        config = yaml.load(stream)
+      line = line.strip() # strip away newlines
+      k,v = line.split('=')
+      config[k] = v.strip('"') # strip away quotes
+    except:
+      continue
+  deploy_params_file=config['AZUREDIR']+'/azuredeploy.parameters.json'
+  with open(deploy_params_file,'r') as json_data:
+    deploy_params = json.load(json_data)
+  # replace bash functions with extracted json value
+  config['USER'] = deploy_params['parameters']['vmUserName']['value']
+  config['CLUSTERSIZE']=deploy_params['parameters']['clusterSize']['value']
+  config['VMSIZE']=deploy_params['parameters']['vmSize']['value']
+  config['DCNames']=deploy_params['parameters']['dnsName']['value']
+
+
+# Read in the tests file
+with open(args.test,'r') as stream:
+    try:
+        tests = yaml.load(stream)
     except yaml.YAMLError as e:
         print(e)
         exit(1)
 
-profile=".bash_profile"    # GCP: .profile, EC2: .bash_profile
-if "GCP" ==  config['Platform']:
-    profile=".profile"
+profile=".profile"    # GCP/Azure: .profile, EC2: .bash_profile
+if "EC2" ==  args.platform:
+    profile=".bash_profile"
 
 if args.debug:
     pprint(config)
+    pprint(tests)
 
-run_main(0)
+run_main()
 
-write_datafile("Results_%s_%s_%s.yaml"%(config['Servers']['NumberOfInstances'],config['Servers']['InstanceType'],asd_version),data)
-write_yaml_to_csv(data,config,asd_version)
+if "EC2" == args.platform:
+  filename = "Results_%s_%s_%s.yaml"%(config['Servers']['NumberOfInstances'],config['Servers']['InstanceType'],asd_version)
+#elif "GCP" == args.platform:
+elif "Azure" == args.platform:
+  filename = "Results_%s_%s_%s.yaml"%(config['CLUSTERSIZE'],config['VMSIZE'],asd_version)
+
+write_datafile(filename,data)
+write_yaml_to_csv(filename,data)
 

@@ -1,0 +1,24 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2014-04-01-preview/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "dnsName": {
+            "value": "GEN-UNIQUE-10"
+        },
+        "vmUserName": {
+            "value": "azureuser"
+        },
+        "clusterSize": {
+            "value": 3
+        },
+        "vmSize": {
+            "value": "Standard_Gs1"
+        },
+        "customNamespacePath": {
+           "value": "PATH-TO-YOUR-NAMESPACE-FILE"
+        },
+        "sshPubkey": {
+            "value": "CONTENTS-OF-YOUR-SSH-PUBLIC-KEY"
+        }
+    }
+}

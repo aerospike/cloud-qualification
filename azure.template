@@ -1,0 +1,8 @@
+DEPLOYMENT="ExampleDeployment"
+RESOURCEGROUP="ExampleGroup"
+AZUREDIR="./azure-resource-manager"
+ZONE="West US"
+PKey="$HOME/.ssh/id_rsa"
+# Values obtained through azuredeploy.parameters.json 
+# Used in create_azure_stack, not used in run_bench
+DCNames=$(jq '.parameters.dnsName' ${AZUREDIR}/azuredeploy.parameters.json -c | cut -d ':' -d '"' -f 4)

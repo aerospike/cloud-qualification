@@ -204,7 +204,7 @@
                                    "source /etc/profile\n",
                                    "PUBLICIP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)\n",
                                    "MYIP=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)\n",
-                                   "CONF=/etc/aerospike/aerospike.orig\n",
+                                   "CONF=/etc/aerospike/aerospike.conf\n",
                                    "REGION=", { "Ref" : "AWS::Region" }, "\n",
                                    "mv /opt/aerospike/namespace $CONF\n",
                                    "#sed -i \"/port 3000/a \\\t\taccess-address $PUBLICIP virtual\" $CONF\n",

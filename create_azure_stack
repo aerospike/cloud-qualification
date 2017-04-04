@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+set -x
+
+source azure.params
+
+
+azure group create --name ${RESOURCEGROUP} --location "${ZONE}"
+
+azure group deployment create --name ${DEPLOYMENT} --resource-group ${RESOURCEGROUP} --template-file ${AZUREDIR}/azuredeploy.json --parameters-file ${AZUREDIR}/azuredeploy.parameters.json
+
+CLIENTNAME="$(echo ${DCNames}Clients | awk '{print tolower($0)}')"
+
+azure vm create --admin-username azureuser --location "${ZONE}" --os-type Linux --resource-group ${RESOURCEGROUP} --name "${CLIENTNAME}" --nic-name "${CLIENTNAME}-nic" --public-ip-name "${CLIENTNAME}-ip"  --public-ip-domain-name "${CLIENTNAME}" --public-ip-allocation-method "Dynamic" --image-urn canonical:UbuntuServer:14.04.5-LTS:14.04.201703230 --ssh-publickey-file "$HOME/.ssh/id_rsa.pub" --vm-size "Standard_F8" --vnet-name "aerospikevnet" --vnet-subnet-name "dbsubnet" --custom-data CloudInitScript.txt
+

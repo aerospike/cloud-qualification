@@ -1,0 +1,14 @@
+Tests:
+    # values are comma delimited in the following order: start, end, interval.
+    # so with service-threads: 2,8,2, the test will start at 2, then 4, 6, and end at 8.
+#    service-threads: 2,8,2
+#    transaction-queues: 2,8,2
+#    transaction-threads-per-queue: 2,8,2
+#    max-write-cache:     not a performance item
+#    fabric-workers: 16,8,32
+#    post-write-queue: 128,1024,128
+#    allow-inline-transactions: true
+    # write-block-size, units are in kilobytes, interval is a multiplier
+    # so 128,1024,2 is: 128,256,512,1024
+#    write-block-size: 128,1024,2
+    write-block-size: 1024,1024,2

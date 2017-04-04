@@ -1,0 +1,386 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "dnsName": {
+            "type": "string",
+            "metadata": {
+                "description": "Connect to your cluster using dnsName.location.cloudapp.azure.com"
+            }
+        },
+        "vmUserName": {
+            "type": "string",
+            "metadata": {
+                "description": "user name to ssh to the VMs"
+            }
+        },
+        "clusterSize": {
+            "type": "int",
+            "metadata": {
+                "description": "The number of nodes in your cluster"
+            }
+        },
+        "vmSize": {
+            "type": "string",
+            "defaultValue": "Standard_Gs1",
+            "metadata": {
+                "description": "size for the VMs"
+            }
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Premium_LRS",
+            "metadata": {
+                "description": "Storage account type for the cluster"
+            }
+        },
+        "updateDomains": {
+            "type": "int",
+            "defaultValue": 2,
+            "metadata": {
+                "description": "The number of update domains"
+            }
+        },
+        "faultDomains": {
+            "type": "int",
+            "defaultValue": 2,
+            "metadata": {
+                "description": "The number of fault domains"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "defaultValue": "aerospikevnet",
+            "metadata": {
+                "description": "Virtual network name for the cluster"
+            }
+        },
+        "vnetNewOrExisting": {
+            "type": "string",
+            "defaultValue": "new",
+            "allowedValues": [
+                "new",
+                "existing"
+            ],
+            "metadata": {
+                "description": "Identifies whether to use new or existing Virtual Network"
+            }
+        },
+        "virtualNetworkExistingRGName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "If using existing VNet, specifies the resource group for the existing VNet"
+            }
+        },
+        "dbSubnetName": {
+            "type": "string",
+            "defaultValue": "dbsubnet",
+            "metadata": {
+                "description": "subnet name for the aerospike nodes"
+            }
+        },
+        "vnetAddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.0.0/16",
+            "metadata": {
+                "description": "IP address in CIDR for virtual network"
+            }
+        },
+        "dbSubnetAddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.1.0/24",
+            "metadata": {
+                "description": "IP address in CIDR for db subnet"
+            }
+        },
+        "dbSubnetStartAddress": {
+            "type": "string",
+            "defaultValue": "10.0.1.4",
+            "metadata": {
+                "description": "Start IP address in the subnet for the VMs"
+            }
+        },
+        "imagePublisher": {
+            "type": "string",
+            "defaultValue": "aerospike",
+            "allowedValues": [
+              "aerospike"
+            ],
+            "metadata": {
+                "description": "publisher for the VM OS image"
+            }
+        },
+        "imageOffer": {
+            "type": "string",
+            "defaultValue": "aerospike-database-vm",
+            "allowedValues": [
+              "aerospike-database-vm"
+            ],
+            "metadata": {
+                "description": "VM OS name"
+            }
+        },
+        "imageSKU": {
+            "type": "string",
+            "defaultValue": "aerospikedb003",
+            "allowedValues": [
+            "aerospikedb003"
+            ],
+            "metadata": {
+                "description": "VM OS version"
+            }
+        },
+        "artifactsPath": {
+            "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/aerospike/azure-resource-manager/master",
+            "metadata": {
+                "description": "template and script file location",
+                "artifactsBaseUrl": "Base URL of the Publisher Template gallery package"
+            }
+        },
+        "customScriptCommandToExecute": {
+            "type": "string",
+            "defaultValue": "bash azure_aerospike.sh",
+            "metadata": {
+                "description": "bash script command line"
+            }
+        },
+        "customNamespacePath":{
+            "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/aerospike/azure-resource-manager/master/namespace.conf",
+            "metadata": {
+                "description": "url of your namespace file"
+            }
+        },
+        "sshPubkey": {
+            "type": "string",
+            "defaultValue": "#Insert your SSH pubkey",
+            "metadata": {
+              "description": "Your SSH public key, typically found at ~/.ssh/id_rsa.pub"
+            }
+        }
+    },
+  "variables": {
+    "templateAPIVersion": "2015-01-01",
+    "resourceAPIVersion": "2015-06-15",
+    "storageAccountName": "[concat(uniquestring(resourceGroup().id),'storage')]",
+    "nicName": "[concat(parameters('dnsName'), '-nic')]",
+    "ipName": "[concat(parameters('dnsName'), '-ip')]",
+    "availabilitySetName": "[concat(parameters('dnsName'), '-set')]",
+    "customScriptFilePath": "[concat(parameters('artifactsPath'), '/azure_aerospike.sh')]",
+    "customNamespacePath": "[parameters('customNamespacePath')]",
+    "customScriptsDir": "/var/lib/waagent/custom-script/download/0/",
+    "virtualNetworkSetupURL": "[concat(parameters('artifactsPath'),'/vnet-',parameters('vnetNewOrExisting'),'.json')]",
+    "sa": "[parameters('dbSubnetStartAddress')]",
+    "ipOctet01": "[concat(split(variables('sa'), '.')[0], '.', split(variables('sa'), '.')[1], '.')]",
+    "ipOctet2": "[int(split(variables('sa'), '.')[2])]",
+    "ipOctet3": "[int(split(variables('sa'), '.')[3])]",
+    "sshKeyPath": "[concat('/home/',parameters('vmUserName'),'/.ssh/authorized_keys')]"
+  },
+    "resources": [
+        {
+            "name": "SettingUpVirtualNetwork",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "[variables('templateAPIVersion')]",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('virtualNetworkSetupURL')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "virtualNetworkName": {
+                        "value": "[parameters('virtualNetworkName')]"
+                    },
+                    "virtualNetworkAddressPrefix": {
+                        "value": "[parameters('vnetAddressPrefix')]"
+                    },
+                    "dbSubnetName": {
+                        "value": "[parameters('dbSubnetName')]"
+                    },
+                    "dbSubnetAddressPrefix": {
+                        "value": "[parameters('dbSubnetAddressPrefix')]"
+                    },
+                    "virtualNetworkExistingRGName": {
+                        "value": "[parameters('virtualNetworkExistingRGName')]"
+                    }
+                }
+            }
+        },
+      {
+        "type": "Microsoft.Storage/storageAccounts",
+        "name": "[variables('storageAccountName')]",
+        "apiVersion": "[variables('resourceAPIVersion')]",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "accountType": "[parameters('storageAccountType')]"
+        }
+      },
+      {
+        "type": "Microsoft.Compute/availabilitySets",
+        "name": "[variables('availabilitySetName')]",
+        "apiVersion": "[variables('resourceAPIVersion')]",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "platformUpdateDomainCount": "[parameters('updateDomains')]",
+          "platformFaultDomainCount": "[parameters('faultDomains')]"
+         }
+      },
+      {
+        "apiVersion": "[variables('resourceAPIVersion')]",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "name": "[concat(variables('ipName'),copyIndex())]",
+        "location": "[resourceGroup().location]",
+        "properties": { 
+          "publicIPAllocationMethod":"Static",
+          "publicIPAddressVersion":"IPv4"
+        },
+        "copy": {
+          "name": "ipLoop",
+          "count": "[parameters('clusterSize')]" 
+        }
+      },
+      {
+        "apiVersion": "[variables('resourceAPIVersion')]",
+        "type": "Microsoft.Network/networkInterfaces",
+        "name": "[concat(variables('nicName'), copyIndex())]",
+        "location": "[resourceGroup().location]",
+        "copy": {
+          "name": "nicLoop",
+          "count": "[parameters('clusterSize')]"
+        },
+        "dependsOn": [
+          "[concat('Microsoft.Resources/deployments/', 'SettingUpVirtualNetwork')]",
+          "[concat('Microsoft.Network/publicIPAddresses/', variables('ipName'), copyIndex())]"
+        ],
+        "properties": {
+          "ipConfigurations": [
+            {
+              "name": "[concat('ipconfig', copyIndex())]",
+              "properties": {
+                "privateIPAllocationMethod": "Static",
+                "privateIPAddress": "[concat(variables('ipOctet01'), add(variables('ipOctet2'), div(copyIndex(variables('ipOctet3')), 255)), '.', mod(copyIndex(variables('ipOctet3')), 255))]",
+                "publicIPAddress" : {
+                  "id": "[resourceId('Microsoft.Network/publicIpAddresses',concat(variables('ipName'),copyIndex()))]"
+                },
+                "subnet": {
+                  "id": "[reference('Microsoft.Resources/deployments/SettingUpVirtualNetwork', variables('templateAPIVersion')).outputs.dbSubnetRef.value]"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "[concat(parameters('dnsName'), copyIndex())]",
+        "type": "Microsoft.Compute/virtualMachines",
+        "apiVersion": "[variables('resourceAPIVersion')]",
+        "location": "[resourceGroup().location]",
+        "copy": {
+          "name": "vmLoop",
+          "count": "[parameters('clusterSize')]"
+        },
+        "plan": {
+          "name": "[parameters('imageSKU')]",
+          "publisher": "[parameters('imagePublisher')]",
+          "product": "[parameters('imageOffer')]"
+        },
+        "dependsOn": [
+          "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+          "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
+          "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'), copyIndex())]",
+          "[concat('Microsoft.Network/publicIPAddresses/', variables('ipName'), copyIndex())]"
+        ],
+        "properties": {
+          "availabilitySet": {
+            "id": "[resourceId('Microsoft.Compute/availabilitySets', variables('availabilitySetName'))]"
+          },
+          "hardwareProfile": {
+            "vmSize": "[parameters('vmSize')]"
+          },
+          "osProfile": {
+            "computerName": "[concat(parameters('dnsName'), copyIndex())]",
+            "adminUsername": "[parameters('vmUserName')]",
+            "linuxConfiguration": {
+              "disablePasswordAuthentication": "true",
+              "ssh": {
+                "publicKeys": [ 
+                  { 
+                    "path": "[variables('sshKeyPath')]",
+                    "keyData": "[parameters('sshPubkey')]"
+                  }
+                ]
+              }
+            }
+          },
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "[parameters('imagePublisher')]",
+              "offer": "[parameters('imageOffer')]",
+              "sku": "[parameters('imageSKU')]",
+              "version": "1.0.0"
+            },
+            "osDisk": {
+              "name": "osdisk",
+              "vhd": {
+                "uri": "[concat(reference(concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName')), variables('resourceAPIVersion')).primaryEndpoints.blob, 'vhds/', parameters('dnsName'), copyIndex(), 'osdisk.vhd')]"
+              },
+              "caching": "ReadWrite",
+              "createOption": "FromImage"
+            },
+            "dataDisks": [
+              {
+                "name": "datadisk1",
+                "diskSizeGB": "1000",
+                "lun": 0,
+                "vhd": {
+                  "uri": "[concat(reference(concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName')), variables('resourceAPIVersion')).primaryEndpoints.blob, 'vhds/', parameters('dnsName'), copyIndex(), 'dataDisk1.vhd')]"
+                },
+                "createOption": "Empty"
+              }
+            ]
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "id": "[concat(resourceId('Microsoft.Network/networkInterfaces',variables('nicName')), copyIndex())]"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "Microsoft.Compute/virtualMachines/extensions",
+        "name": "[concat(parameters('dnsName'), copyIndex(), '/setupaerospike')]",
+        "apiVersion": "[variables('resourceAPIVersion')]",
+        "location": "[resourceGroup().location]",
+        "copy": {
+          "name": "extLoop",
+          "count": "[parameters('clusterSize')]"
+        },
+        "dependsOn": [
+          "[concat('Microsoft.Compute/virtualMachines/', parameters('dnsName'), copyIndex())]",
+          "[concat('Microsoft.Network/publicIPAddresses/', variables('ipName'), copyIndex())]"
+        ],
+        "properties": {
+          "publisher": "Microsoft.Azure.Extensions",
+          "type": "CustomScript",
+          "typeHandlerVersion": "2.0",
+          "autoUpgradeMinorVersion": true,
+          "settings": {
+            "fileUris": [
+              "[variables('customScriptFilePath')]"
+            ],
+            "commandToExecute": "[concat(parameters('customScriptCommandToExecute'), ' ',parameters('dbSubnetStartAddress'), ' ', variables('ipOctet01'), add(variables('ipOctet2'), div(copyIndex(variables('ipOctet3')), 255)), '.', mod(copyIndex(variables('ipOctet3')), 255), ' ',reference(concat('Microsoft.Network/publicIPAddresses/',variables('ipName'), copyIndex())).ipaddress,' ',variables('customNamespacePath'))]"
+          }
+        }
+      }
+    ],
+    "outputs": {
+        "ipaddress": {
+            "value": "[reference(concat('Microsoft.Network/publicIPAddresses/',variables('ipName'),'0')).ipaddress]",
+            "type": "string"
+        }
+    }
+}
