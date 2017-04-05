@@ -3,3 +3,4 @@ botocore
 argparse
 yaml
 pygal
+json

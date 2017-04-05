@@ -111,7 +111,7 @@ Edit `aerospike.conf` to set your namespace configs. (eg: number of devices, sto
 
 Edit `workload-aerospike` with the number of objects and object size as determined from above. `operationcount` should be 3 times the amount of `recordcount`. Make sure that `maxexecutiontime` (in s) is long enough to run the entire test.
 
-Make a copy of `ec2.template` and name it `ec2.params`. Update the values needed for your deployment.
+Make a copy of `ec2.template` and name it `ec2.params`. 
 
 Replace the following variables with those matching your environment:
 
@@ -139,7 +139,7 @@ Create your own namespace file and upload it to a publically accessible location
 * vmUserName - The user account that will be created on the VMs
 * clusterSize - The size of the cluster
 * customNamespacePath - The path to your custom namespace file
-* sshPubkey - The contents of your public key, typically at `~/.ssh/id_rsa`
+* sshPubkey - The contents of your public key, typically found at `$HOME/.ssh/id_rsa`
 
 Copy `azure.template` to `azure.params`, then update the values needed for deployment:
 
@@ -234,23 +234,32 @@ optional arguments:
 ## Files
 
 * aerospike.conf - The default Aerospike configuration
+* azure-resource-manager - ARM templates for starting an Aerospike Cluster
 * cft - Directory of EC2 **C**loud**F**ormation **T**emplates. Used in spinning up an EC2 stack
+* CloudInitScript.txt - The [CloudInit](https://cloudinit.readthedocs.io/en/latest/) script used to initialize Azure client instance.
+* create\_azure\_stack - script to create an Azure stack
 * create\_ec2\_stack - script to create an EC2 stack
-* params.yaml.template - Template for main config file for this project
+* tests.yaml - Template for tests to run with this project
 * README.md - This README file
-* requirements.txt - Python requirements file
+* requirements.txt - Python PIP requirements file
 * run\_bench.py - The main script that runs the YCSB tests
 * scripts - Directory of scripts that may be used on the Aerospike Servers themselves for additional configurations
-* workload-aerospike - The YCSB workload file that's run by YCSB for benchmarking.
+* workload-aerospike - The YCSB workload file that's run by YCSB for benchmarking. AWS/GCP only. For Azure, see CloudInitScript.txt
+* \*.template - The configuration file templates for the respective platforms. Filled in config files are referenced as .param files throughout this document.
 
 ```
 ├── aerospike.conf
+├── azure.template
+├── azure-resource-manager
 ├── cft
 │   ├── aerospike.json
 │   └── clients.json
+├── CloudInitScript.txt
+├── create_azure_stack
 ├── create_ec2_stack
 ├── data
-├── params.yaml.template
+├── ec2.template
+├── tests.yaml
 ├── README.md
 ├── requirements.txt
 ├── run_bench.py
