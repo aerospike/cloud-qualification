@@ -1,16 +1,35 @@
 #!/bin/bash
 
 set -e
-set -x
-
-source azure.params
+#set -x
 
 
-azure group create --name ${RESOURCEGROUP} --location "${ZONE}"
+for PARAM in "${@}"; do
+	if [ "${PARAM}" == "-p" ]; then
+		shift
+		source ${1}
+		shift
+	else
+		echo "Usage: ${0} -p azure.params"
+		exit
+	fi
+done
 
-azure group deployment create --name ${DEPLOYMENT} --resource-group ${RESOURCEGROUP} --template-file ${AZUREDIR}/azuredeploy.json --parameters-file ${AZUREDIR}/azuredeploy.parameters.json
+az group create --name ${RESOURCEGROUP} --location "${ZONE}"
+
+az group deployment create --name ${DEPLOYMENT} --resource-group ${RESOURCEGROUP} --template-file ${AZUREDIR}/azuredeploy.json --parameters ${AZUREDIR}/azuredeploy.parameters.json
 
 CLIENTNAME="$(echo ${DCNames}Clients | awk '{print tolower($0)}')"
 
-azure vm create --admin-username azureuser --location "${ZONE}" --os-type Linux --resource-group ${RESOURCEGROUP} --name "${CLIENTNAME}" --nic-name "${CLIENTNAME}-nic" --public-ip-name "${CLIENTNAME}-ip"  --public-ip-domain-name "${CLIENTNAME}" --public-ip-allocation-method "Dynamic" --image-urn canonical:UbuntuServer:14.04.5-LTS:14.04.201703230 --ssh-publickey-file "$HOME/.ssh/id_rsa.pub" --vm-size "Standard_F8" --vnet-name "aerospikevnet" --vnet-subnet-name "dbsubnet" --custom-data CloudInitScript.txt
+az vm create --admin-username azureuser \
+	--location "${ZONE}" \
+	--resource-group ${RESOURCEGROUP} \
+	--name "${CLIENTNAME}" \
+	--public-ip-address "${CLIENTNAME}-ip" \
+	--image canonical:UbuntuServer:14.04.5-LTS:14.04.201703230 \
+	--ssh-key-value "$HOME/.ssh/id_rsa.pub" \
+	--size "Standard_F8s" \
+	--vnet-name "aerospikevnet" \
+	--subnet "dbsubnet" \
+	--custom-data CloudInitScript.txt
 
