@@ -9,6 +9,7 @@ for PARAM in "${@}"; do
 		shift
 		source ${1}
 		shift
+		break
 	else
 		echo "Usage: ${0} -p azure.params"
 		exit
