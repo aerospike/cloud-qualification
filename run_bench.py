@@ -404,7 +404,7 @@ def shell_command(command):
     return proc.stdout.read()
 
 def extract_azure_ips(name,group):
-    azure_instances=shell_command("azure network public-ip list %s --json"%group)
+    azure_instances=shell_command("az network public-ip list -g %s"%group)
     azure_results=json.loads(azure_instances)
     if args.debug:
       print "azure command output: %s"%json.dumps(azure_results)
