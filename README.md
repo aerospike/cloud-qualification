@@ -133,12 +133,14 @@ _AZURE_
 
 The default settings are already configured for qualifying on instances that can reserve 25GB of ram for Aerospike.
 
+Start by running 'git submodule init && git submodule update`. This will clone our Azure Resource Manager templates into `./azure-resource-manager`. 
+
 Create your own namespace file and upload it to a publically accessible location (eg: github). Edit `azure-resource-manager/azuredeploy.parameters.json` with the path of the file, along with the following
 
 * dnsName - The naming schema the VMs will have
 * vmUserName - The user account that will be created on the VMs
 * clusterSize - The size of the cluster
-* customNamespacePath - The path to your custom namespace file
+* customNamespacePath - The url to your custom namespace file
 * sshPubkey - The contents of your public key, typically found at `$HOME/.ssh/id_rsa`
 
 Copy `azure.template` to `azure.params`, then update the values needed for deployment:
