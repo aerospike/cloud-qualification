@@ -452,7 +452,7 @@ def run_main():
     if "Azure" == args.platform:
         user=config['USER']
         server_ips = extract_azure_ips(config['DCNames'],group)
-        client_ips = extract_azure_ips(config['DCNames'].lower()+'clients',group)
+        client_ips = extract_azure_ips('client'+config['DCNames'].lower(),group)
         private_ips = ["10.0.1.4"] # hardcoded in ARM template
     
     if args.debug:

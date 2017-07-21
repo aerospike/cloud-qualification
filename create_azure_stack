@@ -20,7 +20,7 @@ az group create --name ${RESOURCEGROUP} --location "${ZONE}"
 
 az group deployment create --name ${DEPLOYMENT} --resource-group ${RESOURCEGROUP} --template-file ${AZUREDIR}/azuredeploy.json --parameters ${AZUREDIR}/azuredeploy.parameters.json
 
-CLIENTNAME="$(echo ${DCNames}Clients | awk '{print tolower($0)}')"
+CLIENTNAME="$(echo client${DCNames} | awk '{print tolower($0)}')"
 
 az vm create --admin-username azureuser \
 	--location "${ZONE}" \
