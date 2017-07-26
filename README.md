@@ -124,7 +124,7 @@ Create your environment:
 `./create_ec2_stack -p ec2.params`
 
 Then load your test:
-`./run_bench.py -t tests.yaml -p ec2.params -n ssd -l -z 300 Azure`
+`./run_bench.py -t tests.yaml -p ec2.params -n ssd -l -z 300`
 
 Finally run your test:
 `./run_bench.py -t tests.yaml -p ec2.params -n ssd -o YOUR_TARGET_OPS -z 300 -r`
@@ -158,7 +158,7 @@ Create your environment;
 `./create_azure_stack -p azure.params`
 
 The load your test:
-`./run_bench.py -t tests.yaml -p azure.params -n ssd -l -z 300`
+`./run_bench.py -t tests.yaml -p azure.params -n ssd -l -z 300 Azure`
 
 Finally run your test:
 `./run_bench.py -t tests.yaml -p azure.params -n ssd -o YOUR_TARGET_OPS -z 300 -r`
