@@ -220,7 +220,10 @@ def ssh_command(ip,config,command):
     sys_cmd = ssh_cmd +' "'+ command+'"'
     proc = subprocess.Popen(sys_cmd, shell=True, stdout=subprocess.PIPE)
     sys.stdout.write("\n")
-    return proc.stdout.read()
+    output = proc.stdout.read()
+    if proc.returncode:
+        print "Error in child process: %d" % proc.returncode
+    return output
 
 #----
 # ASD Cluster Commands
@@ -250,13 +253,28 @@ def update_server_config(servers, metric, value, config):
 def reset_server_ssd(servers, config):
     print "Wiping SSD at /dev/sd[bcde]"
     for server in servers:
-      ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb")
       if 'EC2' ==  args.platform:
+        if config['Servers']['InstanceType'].startswith('i3'):
+            ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme0n1")
+            if config['Servers']['InstanceType'] in ['i3.4xlarge']:
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme1n1")
+            if config['Servers']['InstanceType'] in ['i3.8xlarge']:
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme2n1")
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme3n1")
+            if config['Servers']['InstanceType'] in ['i3.16xlarge']:
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme4n1")
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme5n1")
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme6n1")
+                ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/nvme7n1")
+        else:
+            ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb")
         if config['Servers']['InstanceType'] in ["c3.large","c3.xlarge","c3.2xlarge","c3.4xlarge","c3.8xlarge","m3.xlarge","m3.2xlarge","r3.8xlarge","i2.2xlarge"]:
             ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdc")
         if config['Servers']['InstanceType'] in ["i2.2xlarge"]:
             ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdd")
             ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sde")
+      else:
+        ssh_command(server,config, "sudo dd if=/dev/zero bs=1M count=1 of=/dev/sdb")
 
 def stop_server(servers,config):
     print "Stopping Aerospike"

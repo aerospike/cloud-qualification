@@ -36,7 +36,8 @@
                                 "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
                                 "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
                                 "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
-                                "i2.xlarge", "i2.2xlarge", "i2.4xlarge"
+                                "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge",
+                                "i3.large", "i3.xlarge", "i3.2xlarge", "i3.4xlarge", "i3.8xlarge", "i3.16xlarge"
                                 ]
         },
         "EBS" : {
@@ -67,7 +68,7 @@
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.8xlarge" ]}
                         ] },
-		"Has2Ephemeral" : { "Fn::Or" : [
+        "Has2Ephemeral" : { "Fn::Or" : [
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.large" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "c3.2xlarge" ]},
@@ -77,8 +78,8 @@
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "m3.2xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "r3.8xlarge" ]},
                             { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.2xlarge" ]}
-							] },
-	    "Has4Ephemeral" : { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]}
+                            ] },
+        "Has4Ephemeral" : { "Fn::Equals" : [ { "Ref" : "InstanceType" }, "i2.4xlarge" ]}
     },
 
     "Resources" : {
@@ -260,21 +261,21 @@
                                      "VolumeType" : "gp2" }
                         }]
                     ] },
-					{ "Fn::If" : [ "Has2Ephemeral",
+                    { "Fn::If" : [ "Has2Ephemeral",
                      { "Fn::If" : [ "NotUsingEBS",
                         [{
                             "DeviceName" : "/dev/xvdb",
                             "VirtualName" : "ephemeral0"
-						},{
-							"DeviceName" : "/dev/xvdc",
-							"VirtualName" : "ephemeral1"
+                        },{
+                            "DeviceName" : "/dev/xvdc",
+                            "VirtualName" : "ephemeral1"
                         }],
                         [{
                             "DeviceName" : "/dev/xvdb",
                             "VirtualName" : "ephemeral0"
-						},{
-							"DeviceName" : "/dev/xvdc",
-							"VirtualName" : "ephemeral1"
+                        },{
+                            "DeviceName" : "/dev/xvdc",
+                            "VirtualName" : "ephemeral1"
                         },
                         {
                             "DeviceName" : "/dev/sdg",
@@ -324,8 +325,8 @@
                                      "VolumeType" : "gp2" }
                         }]
                     ] }
-				] }
-				] }
+                ] }
+                ] }
                 ] },
                 "KeyName" : { "Ref" : "KeyPair" },
                 "IamInstanceProfile" : { "Ref" : "ClusterInstanceProfile" },
