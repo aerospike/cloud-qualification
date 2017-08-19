@@ -11,13 +11,13 @@ import sys
 import time
 import subprocess
 from multiprocessing.pool import ThreadPool
-#from googleapiclient import discovery
+from googleapiclient import discovery
 from threading import Thread
 from pprint import pprint
-#from oauth2client.client import GoogleCredentials
-#credentials = GoogleCredentials.get_application_default()
-#compute = discovery.build('compute','v1',credentials=credentials)
-#service = discovery.build('deploymentmanager','v2',credentials=credentials)
+from oauth2client.client import GoogleCredentials
+credentials = GoogleCredentials.get_application_default()
+compute = discovery.build('compute','v1',credentials=credentials)
+service = discovery.build('deploymentmanager','v2',credentials=credentials)
 
 import json
 
@@ -395,12 +395,15 @@ def extract_instance_ip(ec2_client,instances,public=True):
 #------
 # Get server IP
 #------
-def extract_gce_ips(project,zone,instances):
-    publicIP=[]
+def extract_gce_ips(project,zone,instances,public=True):
+    IP=[]
     for name in instances:
         result = compute.instances().get(instance=name,zone=zone,project=project).execute()
-        publicIP.append(result['networkInterfaces'][0]['accessConfigs'][0]['natIP'])
-    return publicIP
+        if public:
+            IP.append(result['networkInterfaces'][0]['accessConfigs'][0]['natIP'])
+        else:
+            IP.append(result['networkInterfaces'][0]['networkIP'])
+    return IP
 
 def extract_gce_instances(project,deployment):
     instances=[]
@@ -448,7 +451,7 @@ def run_main():
         group = extract_autoscaling_group(client,config['DCNames'])
         client_group = extract_autoscaling_group(client,config['DCNames']+'-clients')
     if "GCP" == args.platform:
-        group = extract_gce_instances(config['project'],config['deployment'])
+        group = extract_gce_instances(config['PROJECT'],config['DEPLOYMENT'])
     if "Azure" == args.platform:
         group = config['RESOURCEGROUP']
     if args.debug:
@@ -464,9 +467,10 @@ def run_main():
         client_ips = extract_instance_ip(ec2_resource,client_instances)
         private_ips = extract_instance_ip(ec2_resource,instances,public=False)
     if "GCP" == args.platform:
-        user='root'
-        server_ips = extract_gce_ips(config['project'],"us-central1-f",group)
-        client_ips = extract_gce_ips(config['project'],"us-central1-f",["bench-client"])   
+        user='ubuntu'
+        server_ips = extract_gce_ips(config['PROJECT'],config['ZONE'],group)
+        client_ips = extract_gce_ips(config['PROJECT'],config['ZONE'],["bench-client"])   
+        private_ips = extract_gce_ips(config['PROJECT'],config['ZONE'],group,public=False)
     if "Azure" == args.platform:
         user=config['USER']
         server_ips = extract_azure_ips(config['DCNames'],group)
@@ -519,6 +523,26 @@ elif "Azure" == args.platform:
   config['CLUSTERSIZE']=deploy_params['parameters']['clusterSize']['value']
   config['VMSIZE']=deploy_params['parameters']['vmSize']['value']
   config['DCNames']=deploy_params['parameters']['dnsName']['value']
+elif "GCP" == args.platform:
+  conffile = open(args.config,'r').readlines()
+  config = {}
+  for line in conffile:
+    try:
+      line = line.strip() # strip away newlines
+      k,v = line.split('=')
+      config[k] = v.strip('"') # strip away quotes
+    except:
+      continue
+  print config
+  deploy_params_file=config['conffile']
+  with open(deploy_params_file,'r') as yaml_data:
+    deploy_params = yaml.load(yaml_data)
+  # replace bash functions with extracted json value
+  config['ZONE'] = deploy_params['resources'][0]['properties']['zone']
+  config['VMSIZE'] = deploy_params['resources'][0]['properties']['machineType']
+  config['CLUSTERSIZE'] = deploy_params['resources'][0]['properties']['numReplicas']
+
+
 
 
 # Read in the tests file
@@ -541,8 +565,7 @@ run_main()
 
 if "EC2" == args.platform:
   filename = "Results_%s_%s_%s.yaml"%(config['Servers']['NumberOfInstances'],config['Servers']['InstanceType'],asd_version)
-#elif "GCP" == args.platform:
-elif "Azure" == args.platform:
+elif args.platform in ["Azure","GCP"]:
   filename = "Results_%s_%s_%s.yaml"%(config['CLUSTERSIZE'],config['VMSIZE'],asd_version)
 
 write_datafile(filename,data)

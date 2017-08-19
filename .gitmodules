@@ -1,3 +1,6 @@
 [submodule "azure-resource-manager"]
 	path = azure-resource-manager
 	url = git@github.com:aerospike/azure-resource-manager.git
+[submodule "gce-deployment-manager"]
+	path = gce-deployment-manager
+	url = https://github.com/aerospike/gce-deployment-manager

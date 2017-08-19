@@ -29,8 +29,12 @@ This project can be utilized in several ways:
 * Azure CLI 2.0, also signed in and authorized:
   * See https://docs.microsoft.com/en-us/cli/azure/install-azure-cli for installation instructions
   * `azure login`
-
-## Parameters
+**GCP**
+* `gcloud` API, signed in and authorized:
+  * See https://cloud.google.com/sdk/
+* Enable Deployment Manager API: https://console.cloud.google.com/flows/enableapi?apiid=deploymentmanager or from API Manager and enable Google Cloud Deployment Manager API and Google Cloud Deployment Manager V2 API
+* Configure `gcloud` api:
+  * `gcloud init`
 Parameters are in the following dimensions:
 
 ### 1. Server Parameters
@@ -65,6 +69,12 @@ YCSB Client instance size as in number of clients and instance type.
 See the Clients section of `ec2.params`
 
 **Notes** It is highly suggested to use spot pricing. Take a moment to check out spot pricing history and be flexible on which AZ to utilize to achieve maximum cost savings.
+
+#### Azure ####
+Aerospike Service VM size is defined in `azure-resource-manager/azuredeploy.parameters.json`
+
+#### GCP ####
+Aerospike Service VM size is defined in `gce-deployment-manager/config.yaml`
 
 ### 3. Workload
 
@@ -124,10 +134,10 @@ Create your environment:
 `./create_ec2_stack -p ec2.params`
 
 Then load your test:
-`./run_bench.py -t tests.yaml -p ec2.params -n ssd -l -z 300`
+`./run_bench.py -t tests.yaml -p ec2.params -n ssd -l -z 300 EC2`
 
 Finally run your test:
-`./run_bench.py -t tests.yaml -p ec2.params -n ssd -o YOUR_TARGET_OPS -z 300 -r`
+`./run_bench.py -t tests.yaml -p ec2.params -n ssd -o YOUR_TARGET_OPS -z 300 -r EC2`
 
 _AZURE_
 
@@ -161,9 +171,43 @@ The load your test:
 `./run_bench.py -t tests.yaml -p azure.params -n ssd -l -z 300 Azure`
 
 Finally run your test:
-`./run_bench.py -t tests.yaml -p azure.params -n ssd -o YOUR_TARGET_OPS -z 300 -r`
+`./run_bench.py -t tests.yaml -p azure.params -n ssd -o YOUR_TARGET_OPS -z 300 -r Azure`
+
+_GCP_
+
+The default settings are already configured for qualifying on instances that can reserve 25GB of ram for Aerospike.
+
+Start by running 'git submodule init && git submodule update`. This will clone our Deployment Manager templates into `./gce-deployment-manager`.
+
+Edit `gce-deployment-manager/config.yaml` with your parameters:
+
+* numReplicas - The size of the cluster
+* namePrefix - The name given to each machine
+* zone - The zone to deploy in
+* machineType - The size of each server VM
+* numLocalSSDs - The number of locally attached SSDs
+* useShadowDevice - How to treat the next param. If true, the number of disks will match the number of locally attached SSDs. If false, only 1 disk will be deployed.
+* diskSize - The size of network attached disk(s)
+* namespace - Your namespace definition
+
+Copy `gcp.template` to `gcp.params`, then update the values needed for deployment:
+
+* DEPLOYMENT - Give a deployment name.
+* PROJECT - Your project name when you did `gcloud init`
+* conffile - The path to the config.yaml file above.
+* PKey - Path to the pkey used when you did `gcloud init`
+
+Finally, update `workload-aerospike` that is contained within `CloudInitScript.txt` `operationcount` should be 3 times the amount of `recordcount`. Make sure that `maxexecutiontime` (in s) is long enough to run the entire test.
 
 
+Create your environment;
+`./create_gcp_stack -p gcp.params`
+
+The load your test:
+`./run_bench.py -t tests.yaml -p azure.params -n ssd -l -z 300 GCP`
+
+Finally run your test:
+`./run_bench.py -t tests.yaml -p azure.params -n ssd -o YOUR_TARGET_OPS -z 300 -r GCP`
 
 ## Usage:
 
