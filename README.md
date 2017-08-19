@@ -25,16 +25,19 @@ This project can be utilized in several ways:
 * Boto3 for Python `sudo pip install --upgrade boto3`
   * AWS credentials pre-configured at ~/.aws/credentials
 * AWS account with cloudformation and ec2 privileges.
+
 **Azure**
 * Azure CLI 2.0, also signed in and authorized:
   * See https://docs.microsoft.com/en-us/cli/azure/install-azure-cli for installation instructions
   * `azure login`
+
 **GCP**
 * `gcloud` API, signed in and authorized:
   * See https://cloud.google.com/sdk/
 * Enable Deployment Manager API: https://console.cloud.google.com/flows/enableapi?apiid=deploymentmanager or from API Manager and enable Google Cloud Deployment Manager API and Google Cloud Deployment Manager V2 API
 * Configure `gcloud` api:
   * `gcloud init`
+
 Parameters are in the following dimensions:
 
 ### 1. Server Parameters
@@ -90,6 +93,8 @@ The workload defines:
 
 ## Results
 All results will be found in the `data/` directory. Each file will be a yaml dump of the results. The filenames are based on the Server side Test ran.
+
+Alternatively, you can also log into the client systems and obtain the YCSB logs from $HOME/run.log and $HOME/load.log.
 
 
 # Cloud Qualification
@@ -246,14 +251,12 @@ Run the bench without specifying `-o`, but set a high `-z`. This will allow YCSB
 By default, YCSB will run its loading phase followed by all the tests in the running phase. You can manually separate the loading and running phases by specifying either `-l` or `-r`, respectively. Specifying both is the same as leaving them out.
 
 ```
-usage: run_bench.py [-h] [-v] -p CONFIG -t TEST -n NAMESPACE [-d [DEPLOYMENT]]
-                    [-o [OPS]] [-z [THREADS]] [-l] [-r]
-                    platform location
+usage: run_bench.py [-h] [-v] -p CONFIG -t TEST -n NAMESPACE [-o [OPS]]
+                    [-z [THREADS]] [-l] [-r]
+                    platform
 
 positional arguments:
   platform              Azure, GCP, or EC2
-  location              The region/zone where you're deploying. eg: EC2: us-
-                        west-2, Azure: westus, GCP: us-central-1f
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -272,19 +275,17 @@ optional arguments:
   -r, --run             Run only the Running phase (Read/Update)
 ```
 
-## TODO
-
-* GCP version
-
 
 ## Files
 
 * aerospike.conf - The default Aerospike configuration
-* azure-resource-manager - ARM templates for starting an Aerospike Cluster
+* azure-resource-manager - ARM templates for starting an Aerospike Cluster in Azure
 * cft - Directory of EC2 **C**loud**F**ormation **T**emplates. Used in spinning up an EC2 stack
 * CloudInitScript.txt - The [CloudInit](https://cloudinit.readthedocs.io/en/latest/) script used to initialize Azure client instance.
 * create\_azure\_stack - script to create an Azure stack
 * create\_ec2\_stack - script to create an EC2 stack
+* create\_gcp\_stack - script to create a GCP stack
+* gce-deployment-manager - Deployment Manager templates for starting an Aerospike Cluster in GCP
 * tests.yaml - Template for tests to run with this project
 * README.md - This README file
 * requirements.txt - Python PIP requirements file
@@ -303,8 +304,11 @@ optional arguments:
 ├── CloudInitScript.txt
 ├── create_azure_stack
 ├── create_ec2_stack
+├── create_gcp_stack
 ├── data
 ├── ec2.template
+├── gce-deployment-manager
+├── gcp.template
 ├── tests.yaml
 ├── README.md
 ├── requirements.txt
