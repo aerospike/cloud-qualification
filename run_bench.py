@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 import argparse
-import boto3
-import botocore
 import yaml
 import socket
 import csv
@@ -11,15 +9,9 @@ import sys
 import time
 import subprocess
 from multiprocessing.pool import ThreadPool
-from googleapiclient import discovery
 from threading import Thread
 from pprint import pprint
-from oauth2client.client import GoogleCredentials
-credentials = GoogleCredentials.get_application_default()
-compute = discovery.build('compute','v1',credentials=credentials)
-service = discovery.build('deploymentmanager','v2',credentials=credentials)
 
-import json
 
 args = None
 data = {}
@@ -28,13 +20,6 @@ asd_version = ""
 user="ec2-user"
 pool = ThreadPool(processes=2)
 private_ips = None
-
-
-try:
-  import boto3
-except:
-  print "Boto3 is not installed. Please install boto3: sudo pip install boto3"
-  exit
 
 
 def parse_args():
@@ -499,13 +484,23 @@ if args.debug:
 
 # Read in the params file
 if "EC2" == args.platform:
+  try:
+    import boto3
+  except:
+    print "Boto3 is not installed. Please install boto3: sudo pip install --upgrade boto3"
+    exit
   with open(args.config,'r') as stream:
-      try:
-          config = yaml.load(stream)
-      except yaml.YAMLError as e:
-          print(e)
-          exit(1)
+    try:
+      config = yaml.load(stream)
+    except yaml.YAMLError as e:
+      print(e)
+      exit(1)
 elif "Azure" == args.platform:
+  try:
+    import json
+  except:
+    print "Json library not installed. Please install: sudo pip install --upgrade json"
+    exit
   conffile = open(args.config,'r').readlines()
   config = {}
   for line in conffile:
@@ -524,6 +519,15 @@ elif "Azure" == args.platform:
   config['VMSIZE']=deploy_params['parameters']['vmSize']['value']
   config['DCNames']=deploy_params['parameters']['dnsName']['value']
 elif "GCP" == args.platform:
+  try:
+    from googleapiclient import discovery
+    from oauth2client.client import GoogleCredentials
+    credentials = GoogleCredentials.get_application_default()
+    compute = discovery.build('compute','v1',credentials=credentials)
+    service = discovery.build('deploymentmanager','v2',credentials=credentials)
+  except:
+    print "oauth2client and/or gcp python client not installed. Please install: sudo pip install --upgrade google-api-python-client oauth2client"
+    exit
   conffile = open(args.config,'r').readlines()
   config = {}
   for line in conffile:
@@ -537,7 +541,7 @@ elif "GCP" == args.platform:
   deploy_params_file=config['conffile']
   with open(deploy_params_file,'r') as yaml_data:
     deploy_params = yaml.load(yaml_data)
-  # replace bash functions with extracted json value
+  # replace bash functions with extracted yaml value
   config['ZONE'] = deploy_params['resources'][0]['properties']['zone']
   config['VMSIZE'] = deploy_params['resources'][0]['properties']['machineType']
   config['CLUSTERSIZE'] = deploy_params['resources'][0]['properties']['numReplicas']

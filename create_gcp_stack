@@ -1,0 +1,47 @@
+#!/bin/bash
+
+
+for PARAM in "${@}"; do
+    if [ "${PARAM}" == "-p" ]; then
+        shift
+        source ${1}
+        shift
+        break
+    else
+        echo "Usage: ${0} -p gcp.params"
+        exit
+    fi
+done
+
+
+gcloud deployment-manager deployments create $DEPLOYMENT --config $conffile 
+
+# Create client system
+
+client_instance=n1-highcpu-32
+zone=$ZONE
+gcloud compute instances create "bench-client" \
+  --image  ubuntu-1404-trusty-v20160809a \
+  --image-project ubuntu-os-cloud \
+  --machine-type $client_instance \
+  --zone $zone \
+  --metadata startup-script="apt-get update; apt-get install -y git maven openjdk-7-jdk;
+git clone https://github.com/aerospike/YCSB;
+chmod -R 777 /YCSB;"
+
+echo "Waiting on startup script to complete"
+status="."
+while true  
+    do      
+        info=$(gcloud compute ssh bench-client --command="grep Finished /var/log/startupscript.log" -q) || true
+        sleep 5
+        echo -ne "${status}\r"
+        status=$status'.'
+        if [ -n "$info" ]
+            then
+            echo -ne '\n'
+            break
+        fi
+    done
+
+gcloud compute scp workload-aerospike bench-client:/YCSB/workloads/ --zone $zone
