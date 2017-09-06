@@ -283,8 +283,6 @@ def restart_server(servers,config):
 
 def is_migrating(server):
     response = ""
-    migrate_progress_send = 0
-    migrate_progress_recv = 0
     partitions_remaining = 0
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -300,10 +298,6 @@ def is_migrating(server):
         for pair in pairs:
             try:
                 k, v = pair.split('=', 2)
-                if k == 'migrate_progress_send':
-                    migrate_progress_send = int(v)
-                if k == 'migrate_progress_recv':
-                    migrate_progress_recv = int(v)
                 if k == 'migrate_partitions_remaining':
                     partitions_remaining = int(v)
             except:
@@ -313,7 +307,7 @@ def is_migrating(server):
 #    print "migrate_progress_send %s"%migrate_progress_send
 #    print "migrate_progress_recv %s"%migrate_progress_recv
 #    print "paritions_remaining %s"%partitions_remaining
-    if migrate_progress_send == 0 and migrate_progress_recv == 0 and partitions_remaining == 0:
+    if partitions_remaining == 0:
         return False
     else:
         return True
