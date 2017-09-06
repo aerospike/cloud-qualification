@@ -33,7 +33,7 @@ echo "Waiting on startup script to complete"
 status="."
 while true  
     do      
-        info=$(gcloud compute ssh bench-client --command="grep Finished /var/log/startupscript.log" -q) || true
+        info=$(gcloud compute ssh --zone $zone bench-client --command="grep Finished /var/log/startupscript.log" -q) || true
         sleep 5
         echo -ne "${status}\r"
         status=$status'.'

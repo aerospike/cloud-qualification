@@ -37,6 +37,8 @@ This project can be utilized in several ways:
 * Enable Deployment Manager API: https://console.cloud.google.com/flows/enableapi?apiid=deploymentmanager or from API Manager and enable Google Cloud Deployment Manager API and Google Cloud Deployment Manager V2 API
 * Configure `gcloud` api:
   * `gcloud init`
+* Update `gcloud`:
+  * `gcloud components update core`
 
 Parameters are in the following dimensions:
 
