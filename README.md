@@ -39,6 +39,8 @@ This project can be utilized in several ways:
   * `gcloud init`
 * Update `gcloud`:
   * `gcloud components update core`
+* oauth2client:
+  * `sudo pip install --upgrade google-api-python-client oauth2client`
 
 Parameters are in the following dimensions:
 
@@ -200,7 +202,7 @@ Edit `gce-deployment-manager/config.yaml` with your parameters:
 Copy `gcp.template` to `gcp.params`, then update the values needed for deployment:
 
 * DEPLOYMENT - Give a deployment name.
-* PROJECT - Your project name when you did `gcloud init`
+* PROJECT - Your project id when you did `gcloud init`
 * conffile - The path to the config.yaml file above.
 * PKey - Path to the pkey used when you did `gcloud init`
 
