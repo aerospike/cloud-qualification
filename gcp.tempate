@@ -9,3 +9,4 @@ PKey="$HOME/.ssh/id_rsa"
 ZONE=$(grep "zone" ${conffile} | cut -d ':' -f 2 )
 VMSIZE=$(grep "machineType" ${conffile} | cut -d ':' -f 2)
 CLUSTERSIZE=$(grep "numReplicas" ${conffile} | cut -d ':' -f 2)
+NETWORK=$(grep "network" ${conffile} | cut -d ':' -f 2)

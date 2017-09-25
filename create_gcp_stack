@@ -25,6 +25,7 @@ gcloud compute instances create "bench-client" \
   --image-project ubuntu-os-cloud \
   --machine-type $client_instance \
   --zone $zone \
+  --network $NETWORK \
   --metadata startup-script="apt-get update; apt-get install -y git maven openjdk-7-jdk;
 git clone https://github.com/aerospike/YCSB;
 chmod -R 777 /YCSB;"
@@ -44,4 +45,4 @@ while true
         fi
     done
 
-gcloud compute scp --ssh-key-file  $PKEY  workload-aerospike bench-client:/YCSB/workloads/ --zone $zone
+gcloud compute scp workload-aerospike bench-client:/YCSB/workloads/ --zone $zone --ssh-key-file  $PKEY
