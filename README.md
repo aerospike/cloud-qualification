@@ -212,6 +212,8 @@ Finally, update `workload-aerospike` that is contained within `CloudInitScript.t
 Create your environment;
 `./create_gcp_stack -p gcp.params`
 
+Open up port 3003 in the Firewall settings, under VPC network -> Firewall rules.
+
 The load your test:
 `./run_bench.py -t tests.yaml -p azure.params -n ssd -l -z 300 GCP`
 
