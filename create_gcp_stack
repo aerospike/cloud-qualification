@@ -45,4 +45,4 @@ while true
         fi
     done
 
-gcloud compute scp workload-aerospike bench-client:/YCSB/workloads/ --zone $zone --ssh-key-file  $PKEY
+gcloud compute scp workload-aerospike bench-client:/YCSB/workloads/ --zone $zone --ssh-key-file  $PKey
