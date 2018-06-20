@@ -100,7 +100,7 @@ def insert_macros(template, macros):
 def create_stack(botoClient, param, cft, name ):
   global macros
   try:
-    macros = { '#NAMESPACE#': sanitize_json(read_file('aerospike.conf')),
+    macros = { '#NAMESPACE#': sanitize_json(read_file('cft/aerospike.conf')),
                '#WORKLOAD#' : sanitize_json(read_file('workload-aerospike'))
     }
     template = read_file(cft)
